@@ -6,7 +6,7 @@
       <img src="https://img.shields.io/badge/Language-python-green" alt="tyy">
       <img src="https://img.shields.io/badge/Created-2026-blueviolet" alt="Unity Version">
       <img src="https://img.shields.io/badge/Version-1.0.0-blue" alt="Game Version">
-      <img src="https://img.shields.io/badge/License-MIT-success" alt="License">
+      <img src="https://img.shields.io/badge/License-MIT-orange" alt="License">
 </p>
 
 ## О сервисе
