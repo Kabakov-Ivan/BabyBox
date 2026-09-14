@@ -22,7 +22,9 @@
 [Кабаков Иван](https://github.com/Kabakov-Ivan)
 
 [Кирилл Краснов](https://github.com/KirillKrasnov)
+
 [Степан Никишев](https://github.com/Stepan-Nikishev)
+
 [Максим Черемисов](https://github.com/Kabakov-Ivan)
 
 ## Лицензия
