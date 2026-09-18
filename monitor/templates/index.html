@@ -1,9 +1,136 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Моя страница</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Радио няня — Мониторинг</title>
+  <link rel="stylesheet" href="../static/style.css">
 </head>
 <body>
-    <h1>Привет, мир!</h1>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">◉</div>
+      <span>Радио няня</span>
+    </div>
+    <div class="top-actions">
+      <button class="icon-btn" id="themeBtn" title="Тема">☾</button>
+      <div class="datetime">
+        <strong id="clock">22:47</strong>
+        <small id="date">13 сентября 2026</small>
+      </div>
+      <button class="profile">⌾</button>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside class="sidebar">
+      <nav>
+        <button class="nav-item active"><span>⌂</span>Главная</button>
+        <button class="nav-item"><span>▣</span>Камера</button>
+        <button class="nav-item"><span>⌁</span>Датчики</button>
+        <button class="nav-item"><span>▷</span>Записи</button>
+        <button class="nav-item"><span>⚙</span>Настройки</button>
+      </nav>
+
+      <div class="device">
+        <div class="online"><i></i> Устройство онлайн <span>▰ 78%</span></div>
+        <div class="device-row">
+          <div class="camera-mini">◉</div>
+          <div>
+            <strong>Радио няня 1</strong>
+            <small>Спальня · Детская</small>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="dashboard">
+      <section class="camera-card card">
+        <div class="card-head">
+          <div><i class="live-dot"></i> Камера · Прямой эфир</div>
+          <div class="head-controls"><span>1080p</span><button>⛶</button></div>
+        </div>
+        <div class="video">
+          <div class="crib">
+            <div class="baby">😴</div>
+            <div class="blanket"></div>
+            <div class="toy">🧸</div>
+          </div>
+          <div class="video-overlay">Прямой эфир</div>
+          <div class="video-controls">
+            <button>▣</button><button id="micBtn">♩</button><button>●</button><button>🔊</button>
+            <label class="night-toggle">☾ Ночное видение <input type="checkbox" checked><b></b></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="sensors card">
+        <div class="section-title">⌁ <span>Датчики</span></div>
+        <div class="sensor-grid">
+          <article class="sensor">
+            <div class="sensor-icon temp">♨</div><span>Температура</span>
+            <strong>22.4 <em>°C</em></strong><small class="ok">В норме</small>
+            <div class="graph"><i></i></div>
+          </article>
+          <article class="sensor">
+            <div class="sensor-icon humidity">◌</div><span>Влажность</span>
+            <strong>48 <em>%</em></strong><small class="ok">В норме</small>
+            <div class="graph"><i></i></div>
+          </article>
+          <article class="sensor">
+            <div class="sensor-icon sound">◖</div><span>Уровень шума</span>
+            <strong>32 <em>дБ</em></strong><small class="ok">Тихо</small>
+            <div class="graph"><i></i></div>
+          </article>
+          <article class="sensor">
+            <div class="sensor-icon motion">♙</div><span>Движение</span>
+            <strong>Нет</strong><small class="ok">Движения нет</small>
+            <div class="graph"><i></i></div>
+          </article>
+          <article class="sensor wide">
+            <div class="sensor-icon breath">♧</div><span>Дыхание</span>
+            <strong>16 <em>/мин</em></strong><small class="ok">В норме</small>
+            <div class="graph"><i></i></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="control card">
+        <div class="section-title">♧ <span>Управление</span></div>
+        <div class="control-grid">
+          <button class="control-btn" data-action="Колыбельная"><b>♫</b><span>Колыбельная</span></button>
+          <button class="control-btn" data-action="Белый шум"><b>≈</b><span>Белый шум</span></button>
+          <button class="control-btn" data-action="Свет"><b>☼</b><span>Свет</span></button>
+          <button class="control-btn" data-action="Ночной режим"><b>☾</b><span>Ночной режим</span></button>
+        </div>
+        <div class="volume"><span>🔊</span><input type="range" min="0" max="100" value="60"><b>60%</b></div>
+      </section>
+
+      <section class="recordings card">
+        <div class="section-title"><i class="record-dot"></i><span>Запись</span></div>
+        <button class="record-main" id="recordBtn">▣ &nbsp; Начать запись</button>
+        <div class="saved-title">Сохранённые записи <span>›</span></div>
+        <div class="record-list">
+          <div class="record"><div class="thumb">▶</div><div><b>12 сентября 2026, 22:30</b><small>1:24</small></div><span>⋮</span></div>
+          <div class="record"><div class="thumb">▶</div><div><b>12 сентября 2026, 21:17</b><small>0:48</small></div><span>⋮</span></div>
+          <div class="record"><div class="thumb">▶</div><div><b>12 сентября 2026, 19:03</b><small>2:12</small></div><span>⋮</span></div>
+        </div>
+      </section>
+
+      <section class="events card">
+        <div class="section-title">♧ <span>События</span><a href="#">Все</a></div>
+        <div class="timeline">
+          <div><time>22:37</time><i class="event-green">♙</i><p><b>Обнаружено движение</b><small>Детская · Камера</small></p></div>
+          <div><time>21:12</time><i class="event-blue">♨</i><p><b>Температура в норме</b><small>22.5 °C</small></p></div>
+          <div><time>20:45</time><i class="event-purple">◖</i><p><b>Уровень шума повышен</b><small>68 дБ</small></p></div>
+          <div><time>19:32</time><i class="event-green">♙</i><p><b>Обнаружено движение</b><small>Детская · Камера</small></p></div>
+          <div><time>18:20</time><i class="event-cyan">♧</i><p><b>Дыхание в норме</b><small>15 /мин</small></p></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="../static/script.js"></script>
 </body>
 </html>
