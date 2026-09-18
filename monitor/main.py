@@ -1,12 +1,10 @@
-import sys
-from typing import List
+from flask import Flask, render_template
 
+app = Flask(__name__)
 
-class Program:
-    @staticmethod
-    def main(args: List[str]) -> None:
-        print("Для отображения языка в репозитории")
-
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 if __name__ == "__main__":
-    Program.main(sys.argv[1:])
+    app.run(host="0.0.0.0", port=5000)
