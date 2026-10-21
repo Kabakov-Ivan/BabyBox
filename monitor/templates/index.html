@@ -1,136 +1,139 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Радио няня — Мониторинг</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1423">
+  <title>Радио няня — мониторинг</title>
   <link rel="stylesheet" href="../static/style.css">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <div class="brand-icon">◉</div>
+    <a class="brand" href="#dashboard" aria-label="Радио няня, главная">
+      <span class="brand-mark" aria-hidden="true"><i></i></span>
       <span>Радио няня</span>
-    </div>
-    <div class="top-actions">
-      <button class="icon-btn" id="themeBtn" title="Тема">☾</button>
-      <div class="datetime">
-        <strong id="clock">22:47</strong>
-        <small id="date">13 сентября 2026</small>
-      </div>
-      <button class="profile">⌾</button>
+    </a>
+    <div class="topbar-right">
+      <span class="connection-pill" id="connectionPill"><i></i><span id="connectionText">Демо-режим</span></span>
+      <div class="datetime"><strong id="clock">--:--</strong><span id="date">Загрузка даты</span></div>
+      <button class="icon-button theme-button" id="themeBtn" type="button" aria-label="Переключить тему" title="Переключить тему">☾</button>
     </div>
   </header>
 
-  <div class="app">
-    <aside class="sidebar">
-      <nav>
-        <button class="nav-item active"><span>⌂</span>Главная</button>
-        <button class="nav-item"><span>▣</span>Камера</button>
-        <button class="nav-item"><span>⌁</span>Датчики</button>
-        <button class="nav-item"><span>▷</span>Записи</button>
-        <button class="nav-item"><span>⚙</span>Настройки</button>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Основная навигация">
+      <nav class="nav-list">
+        <a class="nav-item active" href="#dashboard"><span aria-hidden="true">⌂</span><b>Главная</b></a>
+        <a class="nav-item" href="#camera"><span aria-hidden="true">▣</span><b>Камера</b></a>
+        <a class="nav-item" href="#sensors"><span aria-hidden="true">⌁</span><b>Датчики</b></a>
+        <a class="nav-item" href="#recordings"><span aria-hidden="true">▷</span><b>Записи</b></a>
+        <a class="nav-item" href="#settings"><span aria-hidden="true">⚙</span><b>Настройки</b></a>
       </nav>
-
-      <div class="device">
-        <div class="online"><i></i> Устройство онлайн <span>▰ 78%</span></div>
-        <div class="device-row">
-          <div class="camera-mini">◉</div>
-          <div>
-            <strong>Радио няня 1</strong>
-            <small>Спальня · Детская</small>
-          </div>
-        </div>
+      <div class="device-card">
+        <div class="device-topline"><span class="device-dot" id="deviceDot"></span><span id="deviceState">Нет подключения</span><span class="battery">—</span></div>
+        <div class="device-info"><span class="device-avatar">◉</span><span><b>Радио няня 1</b><small>Детская комната</small></span></div>
       </div>
+      <p class="sidebar-foot">Учебный прототип</p>
     </aside>
 
-    <main class="dashboard">
-      <section class="camera-card card">
-        <div class="card-head">
-          <div><i class="live-dot"></i> Камера · Прямой эфир</div>
-          <div class="head-controls"><span>1080p</span><button>⛶</button></div>
-        </div>
-        <div class="video">
-          <div class="crib">
-            <div class="baby">😴</div>
-            <div class="blanket"></div>
-            <div class="toy">🧸</div>
+    <main class="dashboard" id="dashboard">
+      <div class="page-heading">
+        <div><p class="eyebrow">ДОМАШНИЙ МОНИТОРИНГ</p><h1>Спокойствие рядом</h1><p class="subheading">Камера, микроклимат и события в детской</p></div>
+        <span class="demo-label" id="dataLabel"><i></i>Показаны демонстрационные данные</span>
+      </div>
+
+      <div class="top-grid">
+        <section class="panel camera-panel" id="camera" aria-labelledby="cameraTitle">
+          <div class="panel-heading">
+            <div class="heading-title"><span class="heading-icon live-indicator" id="cameraDot"></span><div><h2 id="cameraTitle">Камера</h2><p id="cameraState">Источник не подключён</p></div></div>
+            <div class="panel-actions"><span class="quality-tag" id="qualityTag">ОЖИДАНИЕ</span><button class="icon-button" id="fullscreenBtn" type="button" aria-label="Развернуть камеру" title="Развернуть">⛶</button></div>
           </div>
-          <div class="video-overlay">Прямой эфир</div>
-          <div class="video-controls">
-            <button>▣</button><button id="micBtn">♩</button><button>●</button><button>🔊</button>
-            <label class="night-toggle">☾ Ночное видение <input type="checkbox" checked><b></b></label>
+          <div class="camera-stage" id="cameraStage">
+            <div class="camera-illustration" id="streamPlaceholder">
+              <div class="room-glow"></div><div class="moon-shape"></div>
+              <div class="crib-illustration"><div class="crib-head"></div><div class="crib-mattress"></div><div class="crib-rail rail-one"></div><div class="crib-rail rail-two"></div><div class="sleeping-baby">z<sup>z</sup></div></div>
+              <div class="placeholder-copy"><span class="camera-placeholder-icon">▣</span><b>Видеопоток пока не подключён</b><span>Добавьте адрес камеры в настройках</span><button class="button button-primary" id="connectCameraBtn" type="button">Подключить камеру</button></div>
+            </div>
+            <img class="stream-media" id="mjpegStream" alt="Трансляция с камеры" hidden>
+            <video class="stream-media" id="videoStream" playsinline autoplay muted controls hidden></video>
+            <div class="stream-error" id="streamError" hidden>Не удалось получить видеопоток. Проверьте адрес камеры и доступность устройства.</div>
+            <div class="camera-overlay"><span><i></i><span id="overlayCameraState">Ожидание подключения</span></span><span id="streamClock">--:--</span></div>
+            <div class="camera-controls">
+              <button class="round-control" id="videoAudioBtn" type="button" aria-label="Включить звук видео" title="Звук видео">♪</button>
+              <button class="round-control" id="snapshotBtn" type="button" aria-label="Сделать снимок" title="Сделать снимок" disabled>◉</button>
+              <button class="round-control" id="cameraFullscreenBtn" type="button" aria-label="Развернуть видео" title="На весь экран">⛶</button>
+              <button class="night-control" id="nightVisionBtn" type="button" aria-pressed="false"><span>☾</span> Ночное видение <i></i></button>
+            </div>
           </div>
-        </div>
+          <p class="camera-note" id="cameraNote">Для настоящей трансляции нужен адрес видеопотока с вашей камеры.</p>
+        </section>
+
+        <section class="panel sensors-panel" id="sensors" aria-labelledby="sensorsTitle">
+          <div class="panel-heading compact-heading"><div class="heading-title"><span class="section-symbol">⌁</span><div><h2 id="sensorsTitle">Датчики</h2><p>Текущие показания</p></div></div><span class="small-count">6 показателей</span></div>
+          <div class="sensor-grid">
+            <article class="sensor-card" data-card="temp_c"><span class="sensor-icon temp-icon">♨</span><span class="sensor-name">Температура</span><strong><span data-reading="temp_c">22.4</span><em>°C</em></strong><small class="sensor-state" data-state="temp_c">Демо</small><svg class="sparkline temp-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 19 C18 18 19 12 35 14 S55 17 68 10 S87 13 99 5"/></svg></article>
+            <article class="sensor-card" data-card="humidity_pct"><span class="sensor-icon humidity-icon">◌</span><span class="sensor-name">Влажность</span><strong><span data-reading="humidity_pct">48</span><em>%</em></strong><small class="sensor-state" data-state="humidity_pct">Демо</small><svg class="sparkline humidity-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 16 C18 13 24 18 38 12 S58 17 73 11 S89 13 99 8"/></svg></article>
+            <article class="sensor-card" data-card="co2_ppm"><span class="sensor-icon co2-icon">CO₂</span><span class="sensor-name">Уровень CO₂</span><strong><span data-reading="co2_ppm">612</span><em>ppm</em></strong><small class="sensor-state" data-state="co2_ppm">Демо</small><svg class="sparkline co2-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 18 C18 16 20 10 35 13 S53 15 67 8 S82 12 99 6"/></svg></article>
+            <article class="sensor-card" data-card="noise_db"><span class="sensor-icon sound-icon">◖</span><span class="sensor-name">Уровень шума</span><strong><span data-reading="noise_db">32</span><em>дБ</em></strong><small class="sensor-state" data-state="noise_db">Демо</small><svg class="sparkline sound-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 16 C12 13 13 18 23 13 S35 15 44 9 S58 18 69 11 S86 14 99 6"/></svg></article>
+            <article class="sensor-card" data-card="motion"><span class="sensor-icon motion-icon">⌖</span><span class="sensor-name">Движение</span><strong class="text-reading" data-reading="motion">Нет</strong><small class="sensor-state" data-state="motion">Демо</small><svg class="sparkline motion-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 18 L30 18 L36 7 L42 18 L77 18 L83 11 L89 18 L99 18"/></svg></article>
+            <article class="sensor-card" data-card="respiration_bpm"><span class="sensor-icon breath-icon">≈</span><span class="sensor-name">Дыхание*</span><strong><span data-reading="respiration_bpm">16</span><em>/мин</em></strong><small class="sensor-state" data-state="respiration_bpm">Демо</small><svg class="sparkline breath-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 15 C8 15 8 8 15 8 S22 17 29 17 S36 7 43 7 S50 16 57 16 S64 9 71 9 S78 17 85 17 S92 10 99 10"/></svg></article>
+          </div>
+          <p class="sensor-footnote">* Дыхание показано только как пример интерфейса, не как медицинское измерение.</p>
+        </section>
+      </div>
+
+      <div class="bottom-grid">
+        <section class="panel controls-panel" aria-labelledby="controlsTitle">
+          <div class="panel-heading compact-heading"><div class="heading-title"><span class="section-symbol">✣</span><div><h2 id="controlsTitle">Управление</h2><p>Звук и режимы устройства</p></div></div><span class="demo-mini">локальное демо</span></div>
+          <div class="control-grid">
+            <button class="control-tile" type="button" data-action="lullaby" aria-pressed="false"><span class="control-icon">♫</span><b>Колыбельная</b><small>Запустить мелодию</small></button>
+            <button class="control-tile" type="button" data-action="white_noise" aria-pressed="false"><span class="control-icon">≈</span><b>Белый шум</b><small>Мягкий фоновый звук</small></button>
+            <button class="control-tile" type="button" data-action="light" aria-pressed="false"><span class="control-icon">☼</span><b>Свет</b><small class="control-state">Выключен</small></button>
+            <button class="control-tile" type="button" data-action="night_mode" aria-pressed="false"><span class="control-icon">☾</span><b>Ночной режим</b><small class="control-state">Выключен</small></button>
+          </div>
+          <div class="volume-row"><span aria-hidden="true">🔊</span><label for="volumeSlider" class="visually-hidden">Громкость</label><input id="volumeSlider" type="range" min="0" max="100" value="35"><b id="volumeValue">35%</b></div>
+          <p class="controls-note" id="controlsNote">Звук воспроизводится в браузере. Команды на устройство отправляются только после подключения программы.</p>
+        </section>
+
+        <section class="panel events-panel" aria-labelledby="eventsTitle">
+          <div class="panel-heading compact-heading"><div class="heading-title"><span class="section-symbol">✳</span><div><h2 id="eventsTitle">Последние события</h2><p id="eventsSubtitle">Примеры для макета</p></div></div><button class="text-button" id="clearEventsBtn" type="button">Очистить</button></div>
+          <div class="event-list" id="eventList" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <section class="panel recordings-panel" id="recordings" aria-labelledby="recordingsTitle">
+        <div class="panel-heading compact-heading"><div class="heading-title"><span class="section-symbol">▷</span><div><h2 id="recordingsTitle">Записи</h2><p>Снимки и фрагменты видео</p></div></div><button class="button button-secondary" id="recordBtn" type="button" disabled>● Начать запись</button></div>
+        <div class="recording-list" id="recordingList"><div class="empty-state"><span>▧</span><b>Записей пока нет</b><small>Подключите видеопоток, чтобы сохранить фрагмент.</small></div></div>
       </section>
 
-      <section class="sensors card">
-        <div class="section-title">⌁ <span>Датчики</span></div>
-        <div class="sensor-grid">
-          <article class="sensor">
-            <div class="sensor-icon temp">♨</div><span>Температура</span>
-            <strong>22.4 <em>°C</em></strong><small class="ok">В норме</small>
-            <div class="graph"><i></i></div>
-          </article>
-          <article class="sensor">
-            <div class="sensor-icon humidity">◌</div><span>Влажность</span>
-            <strong>48 <em>%</em></strong><small class="ok">В норме</small>
-            <div class="graph"><i></i></div>
-          </article>
-          <article class="sensor">
-            <div class="sensor-icon sound">◖</div><span>Уровень шума</span>
-            <strong>32 <em>дБ</em></strong><small class="ok">Тихо</small>
-            <div class="graph"><i></i></div>
-          </article>
-          <article class="sensor">
-            <div class="sensor-icon motion">♙</div><span>Движение</span>
-            <strong>Нет</strong><small class="ok">Движения нет</small>
-            <div class="graph"><i></i></div>
-          </article>
-          <article class="sensor wide">
-            <div class="sensor-icon breath">♧</div><span>Дыхание</span>
-            <strong>16 <em>/мин</em></strong><small class="ok">В норме</small>
-            <div class="graph"><i></i></div>
-          </article>
+      <section class="panel settings-panel" id="settings" aria-labelledby="settingsTitle">
+        <div class="panel-heading compact-heading"><div class="heading-title"><span class="section-symbol">⚙</span><div><h2 id="settingsTitle">Подключение</h2><p>Настройки камеры и контроллера</p></div></div></div>
+        <div class="settings-grid">
+          <form id="cameraForm" class="setting-block">
+            <div><h3>Видеокамера</h3><p>Укажите URL потока. Для MJPEG обычно подходит адрес вида <code>http://адрес-камеры/video</code>.</p></div>
+            <label>Формат потока<select id="streamType"><option value="mjpeg">MJPEG (изображение)</option><option value="video">Видеофайл или видеопоток</option></select></label>
+            <label>Адрес потока<input id="streamUrl" type="url" inputmode="url" placeholder="http://192.168.4.1:81/stream" autocomplete="url"></label>
+            <button class="button button-primary" type="submit">Подключить видеопоток</button>
+          </form>
+          <form id="deviceForm" class="setting-block">
+            <div><h3>Плата и датчики</h3><p>Адрес программы-посредника, которая читает данные с платы и отдаёт их сайту.</p></div>
+            <label>Адрес API<input id="apiUrl" type="url" inputmode="url" placeholder="http://192.168.4.1:5000" autocomplete="url"></label>
+            <button class="button button-secondary" id="connectDeviceBtn" type="submit">Проверить подключение</button>
+            <small class="api-hint">Ожидается ответ <code>/api/status</code> с показаниями датчиков. Пример формата есть в README.</small>
+          </form>
         </div>
       </section>
-
-      <section class="control card">
-        <div class="section-title">♧ <span>Управление</span></div>
-        <div class="control-grid">
-          <button class="control-btn" data-action="Колыбельная"><b>♫</b><span>Колыбельная</span></button>
-          <button class="control-btn" data-action="Белый шум"><b>≈</b><span>Белый шум</span></button>
-          <button class="control-btn" data-action="Свет"><b>☼</b><span>Свет</span></button>
-          <button class="control-btn" data-action="Ночной режим"><b>☾</b><span>Ночной режим</span></button>
-        </div>
-        <div class="volume"><span>🔊</span><input type="range" min="0" max="100" value="60"><b>60%</b></div>
-      </section>
-
-      <section class="recordings card">
-        <div class="section-title"><i class="record-dot"></i><span>Запись</span></div>
-        <button class="record-main" id="recordBtn">▣ &nbsp; Начать запись</button>
-        <div class="saved-title">Сохранённые записи <span>›</span></div>
-        <div class="record-list">
-          <div class="record"><div class="thumb">▶</div><div><b>12 сентября 2026, 22:30</b><small>1:24</small></div><span>⋮</span></div>
-          <div class="record"><div class="thumb">▶</div><div><b>12 сентября 2026, 21:17</b><small>0:48</small></div><span>⋮</span></div>
-          <div class="record"><div class="thumb">▶</div><div><b>12 сентября 2026, 19:03</b><small>2:12</small></div><span>⋮</span></div>
-        </div>
-      </section>
-
-      <section class="events card">
-        <div class="section-title">♧ <span>События</span><a href="#">Все</a></div>
-        <div class="timeline">
-          <div><time>22:37</time><i class="event-green">♙</i><p><b>Обнаружено движение</b><small>Детская · Камера</small></p></div>
-          <div><time>21:12</time><i class="event-blue">♨</i><p><b>Температура в норме</b><small>22.5 °C</small></p></div>
-          <div><time>20:45</time><i class="event-purple">◖</i><p><b>Уровень шума повышен</b><small>68 дБ</small></p></div>
-          <div><time>19:32</time><i class="event-green">♙</i><p><b>Обнаружено движение</b><small>Детская · Камера</small></p></div>
-          <div><time>18:20</time><i class="event-cyan">♧</i><p><b>Дыхание в норме</b><small>15 /мин</small></p></div>
-        </div>
-      </section>
+      <footer class="page-footer">Радио няня · учебный прототип <span>Данные устройства не заменяют присмотр взрослого</span></footer>
     </main>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <dialog class="connect-dialog" id="connectDialog">
+    <form method="dialog" class="dialog-close-row"><button class="icon-button" value="close" aria-label="Закрыть">×</button></form>
+    <span class="dialog-icon">▣</span><h2>Подключить камеру</h2><p>Вставьте адрес видеопотока с камеры. Его можно изменить позже в разделе «Настройки».</p>
+    <form id="quickCameraForm"><label>Тип потока<select id="quickStreamType"><option value="mjpeg">MJPEG</option><option value="video">Видеопоток</option></select></label><label>URL камеры<input id="quickStreamUrl" type="url" placeholder="http://192.168.4.1:81/stream" required></label><button class="button button-primary" type="submit">Подключить</button></form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../static/script.js"></script>
 </body>
 </html>
+
