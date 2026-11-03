@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>Настройка BabyBox</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #101827;
+      color: #f1f5f9;
+      font-family: Arial, sans-serif;
+    }
+    .card {
+      width: 100%;
+      max-width: 420px;
+      padding: 28px;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      background: #1e293b;
+      box-shadow: 0 20px 60px #0004;
+    }
+    .logo {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border-radius: 15px;
+      background: #38bdf8;
+      color: #082f49;
+      font-size: 26px;
+      font-weight: bold;
+    }
+    h1 { margin: 20px 0 8px; font-size: 26px; }
+    p { color: #cbd5e1; line-height: 1.5; }
+    label {
+      display: block;
+      margin: 18px 0 8px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    select, input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #475569;
+      border-radius: 10px;
+      background: #0f172a;
+      color: white;
+      font-size: 16px;
+    }
+    button {
+      width: 100%;
+      margin-top: 20px;
+      padding: 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #38bdf8;
+      color: #082f49;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    .hint { font-size: 13px; color: #94a3b8; }
+    #message { margin-top: 16px; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="logo">B</div>
+    <h1>Настройка BabyBox</h1>
+    <p>Подключите радионяню к домашней Wi-Fi сети, чтобы открывать мониторинг с телефона.</p>
+
+    <form id="wifiForm">
+      <label for="ssid">Домашняя Wi-Fi сеть</label>
+      <select id="ssid" name="ssid" required>
+        <option value="">Сначала загрузите список сетей</option>
+      </select>
+
+      <button type="button" id="scanBtn">Найти Wi-Fi сети</button>
+
+      <label for="password">Пароль Wi-Fi</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password"
+             placeholder="Введите пароль сети">
+
+      <button type="submit" id="connectBtn">Подключить BabyBox</button>
+    </form>
+
+    <p class="hint">
+      После подключения точка настройки может отключиться.
+      Затем подключите телефон к той же домашней сети.
+    </p>
+    <p id="message" role="status"></p>
+  </main>
+
+  <script>
+    const ssidSelect = document.getElementById('ssid');
+    const passwordInput = document.getElementById('password');
+    const message = document.getElementById('message');
+    const scanBtn = document.getElementById('scanBtn');
+    const connectBtn = document.getElementById('connectBtn');
+
+    async function scanNetworks() {
+      scanBtn.disabled = true;
+      message.textContent = 'Ищем доступные сети…';
+
+      try {
+        const response = await fetch('/wifi/networks');
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || 'Не удалось найти сети');
+
+        ssidSelect.replaceChildren();
+        data.networks.forEach(network => {
+          const option = document.createElement('option');
+          option.value = network.ssid;
+          option.textContent = network.ssid +
+            (network.security ? ' · ' + network.security : '');
+          ssidSelect.appendChild(option);
+        });
+
+        if (!data.networks.length) {
+          message.textContent = 'Сети не найдены. Попробуйте ещё раз.';
+        } else {
+          message.textContent = 'Выберите домашнюю сеть.';
+        }
+      } catch (error) {
+        message.textContent = 'Ошибка: ' + error.message;
+      } finally {
+        scanBtn.disabled = false;
+      }
+    }
+
+    scanBtn.addEventListener('click', scanNetworks);
+
+    document.getElementById('wifiForm').addEventListener('submit', async event => {
+      event.preventDefault();
+
+      if (!ssidSelect.value) {
+        message.textContent = 'Сначала выберите Wi-Fi сеть.';
+        return;
+      }
+
+      connectBtn.disabled = true;
+      message.textContent = 'Сохраняем настройки и подключаемся…';
+
+      try {
+        const response = await fetch('/wifi/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ssid: ssidSelect.value,
+            password: passwordInput.value
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Не удалось подключиться');
+
+        message.textContent = data.message || 'Настройки приняты.';
+      } catch (error) {
+        message.textContent = 'Ошибка: ' + error.message;
+      } finally {
+        connectBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
