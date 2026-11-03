@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, jsonify
 import subprocess
 import re
 import json
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -15,6 +17,30 @@ def run_nmcli(args, timeout=20):
         timeout=timeout,
         check=False
     )
+
+
+def connect_wifi_background(ssid, password):
+    """Join home Wi-Fi after the phone has received the HTTP response."""
+    time.sleep(1.5)
+    try:
+        result = subprocess.run(
+            ["sudo", "-n", "/usr/local/sbin/babybox-wifi"],
+            input=json.dumps({"ssid": ssid, "password": password}),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode == 0:
+            app.logger.info("Wi-Fi connected to %r", ssid)
+        else:
+            app.logger.warning(
+                "Wi-Fi connection failed for SSID %r: %s",
+                ssid,
+                result.stderr.strip() or result.stdout.strip(),
+            )
+    except Exception:
+        app.logger.exception("Background Wi-Fi connect failed for %r", ssid)
 
 
 @app.route("/")
@@ -81,45 +107,21 @@ def wifi_connect():
     if not isinstance(password, str) or len(password) > 63:
         return jsonify(error="Invalid Wi-Fi password."), 400
 
-    try:
-        result = subprocess.run(
-            ["sudo", "-n", "/usr/local/sbin/babybox-wifi"],
-            input=json.dumps({
-                "ssid": ssid,
-                "password": password
-            }),
-            capture_output=True,
-            text=True,
-            timeout=45,
-            check=False
-        )
-
-    except subprocess.TimeoutExpired:
-        return jsonify(
-            error="Connection timed out. Please try again."
-        ), 504
-
-    except OSError:
-        app.logger.exception("Could not start Wi-Fi connection helper")
-        return jsonify(
-            error="Could not start the Wi-Fi connection service."
-        ), 500
-
-    if result.returncode == 0:
-        return jsonify(
-            message="Wi-Fi connection successful. You may need to reconnect to BabyBox using the new network."
-        )
-
-    app.logger.warning(
-        "Wi-Fi connection failed for SSID %r: %s",
-        ssid,
-        result.stderr.strip() or result.stdout.strip()
-    )
+    # Reply first: killing the AP mid-request makes the phone show "Load failed".
+    threading.Thread(
+        target=connect_wifi_background,
+        args=(ssid, password),
+        daemon=True,
+    ).start()
 
     return jsonify(
-        error="Could not connect to this Wi-Fi network. Check the password and try again."
-    ), 400
+        message=(
+            "Принято. BabyBox подключается к домашней сети. "
+            "Точка настройки пропадёт — зайдите в ту же Wi-Fi "
+            "и откройте сайт по IP малины :5000."
+        )
+    )
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, threaded=True)

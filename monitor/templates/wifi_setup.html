@@ -134,9 +134,9 @@
         if (!response.ok) throw new Error(data.error || 'Не удалось подключиться');
 
         message.textContent = data.message || 'Настройки приняты. Подключитесь к домашней Wi-Fi.';
+        connectBtn.disabled = true;
       } catch (error) {
         message.textContent = 'Ошибка: ' + error.message;
-      } finally {
         connectBtn.disabled = false;
       }
     });

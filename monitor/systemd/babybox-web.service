@@ -1,0 +1,17 @@
+[Unit]
+Description=BabyBox web monitor
+After=network.target babybox-boot-wifi.service
+Wants=babybox-boot-wifi.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/BabyBox/monitor
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/main.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
