@@ -41,7 +41,7 @@ if [ ! -f /etc/hostapd/hostapd.conf ]; then
   cat > /etc/hostapd/hostapd.conf <<'EOF'
 interface=wlan0
 driver=nl80211
-ssid=BabyBox-Setup
+ssid=BABY_BOX_SETUP
 hw_mode=g
 channel=7
 ieee80211n=1
@@ -50,11 +50,14 @@ macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
 wpa=2
-wpa_passphrase=babybox123
+wpa_passphrase=Sas23766732
 wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 country_code=RU
 EOF
+else
+  sed -i 's/^ssid=.*/ssid=BABY_BOX_SETUP/' /etc/hostapd/hostapd.conf
+  sed -i 's/^wpa_passphrase=.*/wpa_passphrase=Sas23766732/' /etc/hostapd/hostapd.conf
 fi
 echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' > /etc/default/hostapd
 
@@ -87,6 +90,6 @@ echo "Installed. Reboot to test:"
 echo "  sudo reboot"
 echo
 echo "Flow:"
-echo "  1) Boot → always AP BabyBox-Setup / babybox123 + website"
+echo "  1) Boot → always AP BABY_BOX_SETUP / Sas23766732 + website"
 echo "  2) Phone → http://192.168.4.1:5000/wifi → enter home Wi-Fi"
 echo "  3) Pi joins home Wi-Fi → site on that network IP:5000"

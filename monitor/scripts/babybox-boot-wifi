@@ -1,8 +1,8 @@
 #!/bin/bash
-# On boot: always start BabyBox-Setup access point.
+# On boot: always start BABY_BOX_SETUP access point.
 set -euo pipefail
 
-AP_SSID="BabyBox-Setup"
+AP_SSID="BABY_BOX_SETUP"
 AP_IP="192.168.4.1"
 
 logger -t babybox-boot-wifi "waiting for NetworkManager"
