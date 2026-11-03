@@ -78,73 +78,42 @@
     <p>Подключите радионяню к домашней Wi-Fi сети, чтобы открывать мониторинг с телефона.</p>
 
     <form id="wifiForm">
-      <label for="ssid">Домашняя Wi-Fi сеть</label>
-      <select id="ssid" name="ssid" required>
-        <option value="">Сначала загрузите список сетей</option>
-      </select>
-
-      <button type="button" id="scanBtn">Найти Wi-Fi сети</button>
+      <label for="ssid">Имя домашней Wi-Fi сети (SSID)</label>
+      <input id="ssid" name="ssid" type="text"
+             autocomplete="off"
+             required
+             placeholder="Например: Home_WiFi"
+             maxlength="32">
 
       <label for="password">Пароль Wi-Fi</label>
       <input id="password" name="password" type="password"
              autocomplete="current-password"
-             placeholder="Введите пароль сети">
+             placeholder="Введите пароль сети"
+             maxlength="63">
 
       <button type="submit" id="connectBtn">Подключить BabyBox</button>
     </form>
 
     <p class="hint">
-      После подключения точка настройки может отключиться.
-      Затем подключите телефон к той же домашней сети.
+      Пока BabyBox раздаёт свою сеть, список чужих Wi-Fi недоступен —
+      введите имя домашней сети вручную. После подключения точка настройки
+      отключится: подключите телефон к той же домашней сети.
     </p>
     <p id="message" role="status"></p>
   </main>
 
   <script>
-    const ssidSelect = document.getElementById('ssid');
+    const ssidInput = document.getElementById('ssid');
     const passwordInput = document.getElementById('password');
     const message = document.getElementById('message');
-    const scanBtn = document.getElementById('scanBtn');
     const connectBtn = document.getElementById('connectBtn');
-
-    async function scanNetworks() {
-      scanBtn.disabled = true;
-      message.textContent = 'Ищем доступные сети…';
-
-      try {
-        const response = await fetch('/wifi/networks');
-        const data = await response.json();
-
-        if (!response.ok) throw new Error(data.error || 'Не удалось найти сети');
-
-        ssidSelect.replaceChildren();
-        data.networks.forEach(network => {
-          const option = document.createElement('option');
-          option.value = network.ssid;
-          option.textContent = network.ssid +
-            (network.security ? ' · ' + network.security : '');
-          ssidSelect.appendChild(option);
-        });
-
-        if (!data.networks.length) {
-          message.textContent = 'Сети не найдены. Попробуйте ещё раз.';
-        } else {
-          message.textContent = 'Выберите домашнюю сеть.';
-        }
-      } catch (error) {
-        message.textContent = 'Ошибка: ' + error.message;
-      } finally {
-        scanBtn.disabled = false;
-      }
-    }
-
-    scanBtn.addEventListener('click', scanNetworks);
 
     document.getElementById('wifiForm').addEventListener('submit', async event => {
       event.preventDefault();
 
-      if (!ssidSelect.value) {
-        message.textContent = 'Сначала выберите Wi-Fi сеть.';
+      const ssid = ssidInput.value.trim();
+      if (!ssid) {
+        message.textContent = 'Введите имя Wi-Fi сети.';
         return;
       }
 
@@ -156,7 +125,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ssid: ssidSelect.value,
+            ssid: ssid,
             password: passwordInput.value
           })
         });
@@ -164,7 +133,7 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Не удалось подключиться');
 
-        message.textContent = data.message || 'Настройки приняты.';
+        message.textContent = data.message || 'Настройки приняты. Подключитесь к домашней Wi-Fi.';
       } catch (error) {
         message.textContent = 'Ошибка: ' + error.message;
       } finally {
