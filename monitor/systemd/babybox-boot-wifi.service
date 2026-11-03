@@ -1,0 +1,12 @@
+[Unit]
+Description=BabyBox Wi-Fi mode (AP if no home network)
+After=NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/babybox-boot-wifi
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

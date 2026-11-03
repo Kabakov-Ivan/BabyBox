@@ -1,0 +1,59 @@
+#!/bin/bash
+# Switch from setup AP to a home Wi-Fi network.
+# stdin JSON: {"ssid":"...","password":"..."}
+set -euo pipefail
+
+INPUT=$(cat)
+SSID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["ssid"])' <<<"$INPUT")
+PASS=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("password",""))' <<<"$INPUT")
+CON_NAME="babybox-${SSID}"
+
+restore_ap() {
+  nmcli device set wlan0 managed no || true
+  ip link set wlan0 down || true
+  ip addr flush dev wlan0 || true
+  ip addr add 192.168.4.1/24 dev wlan0 || true
+  ip link set wlan0 up || true
+  systemctl start hostapd dnsmasq || true
+}
+
+systemctl stop hostapd dnsmasq || true
+nmcli device set wlan0 managed yes
+ip addr flush dev wlan0 || true
+sleep 2
+nmcli device wifi rescan || true
+sleep 5
+
+# Drop old profiles for this SSID (avoids key-mgmt errors).
+while IFS= read -r name; do
+  [ -z "$name" ] && continue
+  cur="$(nmcli -g 802-11-wireless.ssid connection show "$name" 2>/dev/null || true)"
+  if [ "$cur" = "$SSID" ]; then
+    nmcli connection delete "$name" || true
+  fi
+done < <(nmcli -t -f NAME connection show)
+
+nmcli connection delete "$CON_NAME" 2>/dev/null || true
+
+set +e
+if [ -n "$PASS" ]; then
+  nmcli connection add type wifi ifname wlan0 con-name "$CON_NAME" ssid "$SSID" \
+    connection.autoconnect yes \
+    wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASS"
+else
+  nmcli connection add type wifi ifname wlan0 con-name "$CON_NAME" ssid "$SSID" \
+    connection.autoconnect yes
+fi
+nmcli --wait 30 connection up "$CON_NAME"
+RC=$?
+set -e
+
+if [ "$RC" -ne 0 ]; then
+  echo "Failed to connect to SSID: [$SSID]" >&2
+  nmcli -f SSID,CHAN,SIGNAL device wifi list >&2 || true
+  nmcli connection delete "$CON_NAME" >/dev/null 2>&1 || true
+  restore_ap
+  exit 1
+fi
+
+logger -t babybox-wifi "connected to ${SSID}"
