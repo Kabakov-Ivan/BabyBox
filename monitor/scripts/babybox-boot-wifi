@@ -1,11 +1,9 @@
 #!/bin/bash
-# On boot: if wlan0 already joined a home network, do nothing.
-# Otherwise start BabyBox-Setup access point.
+# On boot: always start BabyBox-Setup access point.
 set -euo pipefail
 
 AP_SSID="BabyBox-Setup"
 AP_IP="192.168.4.1"
-WAIT_SECS=25
 
 logger -t babybox-boot-wifi "waiting for NetworkManager"
 for _ in $(seq 1 30); do
@@ -15,23 +13,16 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-# Prefer client mode first so a saved home Wi-Fi can autoconnect.
+logger -t babybox-boot-wifi "starting AP ${AP_SSID}"
+
+# Drop any client Wi-Fi so the radio is free for AP.
 nmcli radio wifi on || true
-nmcli device set wlan0 managed yes || true
 systemctl stop hostapd dnsmasq 2>/dev/null || true
 
-logger -t babybox-boot-wifi "waiting up to ${WAIT_SECS}s for existing Wi-Fi"
-for _ in $(seq 1 "$WAIT_SECS"); do
-  state="$(nmcli -t -f DEVICE,STATE device status | awk -F: '$1=="wlan0"{print $2}')"
-  if [ "$state" = "connected" ]; then
-    logger -t babybox-boot-wifi "wlan0 already connected — AP not needed"
-    exit 0
-  fi
-  sleep 1
-done
-
-logger -t babybox-boot-wifi "no Wi-Fi client — starting AP ${AP_SSID}"
+# Disconnect saved client profiles on wlan0 (do not autoconnect on boot).
+nmcli device disconnect wlan0 2>/dev/null || true
 nmcli device set wlan0 managed no
+
 ip link set wlan0 down || true
 ip addr flush dev wlan0 || true
 ip addr add "${AP_IP}/24" dev wlan0
@@ -39,4 +30,5 @@ ip link set wlan0 up
 
 systemctl start hostapd
 systemctl start dnsmasq
+
 logger -t babybox-boot-wifi "AP is up at http://${AP_IP}:5000/wifi"
