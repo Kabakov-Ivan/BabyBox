@@ -15,7 +15,34 @@
 
 ## Что уже реализованно:
 
-Доменный слой.
+BabyBox/
+│
+├── README.md
+├── LICENSE
+├── .gitignore
+│
+└── monitor/                          ← всё приложение
+    │
+    ├── main.py                       ← сервер, API, вся логика
+    ├── camera_stream.py              ← поток с камеры
+    ├── requirements.txt              ← Python-зависимости
+    │
+    ├── templates/                    ← HTML-страницы
+    │   ├── index.html                ← главная (монитор)
+    │   └── wifi_setup.html           ← настройка Wi‑Fi
+    │
+    ├── static/                       ← фронтенд
+    │   ├── style.css                 ← дизайн
+    │   └── script.js                 ← интерактивность
+    │
+    ├── scripts/                      ← системные скрипты
+    │   ├── babybox-wifi
+    │   ├── babybox-boot-wifi
+    │   └── install-autostart.sh      ← автозапуск
+    │
+    └── systemd/                      ← сервисы Linux
+        ├── babybox-web.service
+        └── babybox-boot-wifi.service
 
 ## Разработчик
 
