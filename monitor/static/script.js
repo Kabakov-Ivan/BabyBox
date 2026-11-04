@@ -115,9 +115,11 @@ const streamPlaceholder = $('#streamPlaceholder');
 const mjpegStream = $('#mjpegStream');
 const videoStream = $('#videoStream');
 const streamError = $('#streamError');
+const localStreamUrl = `${window.location.origin}/stream`;
 let cameraUrl = '';
 let streamType = 'mjpeg';
 let streamConnected = false;
+let streamRetryTimer = null;
 
 function setCameraStatus(state, live = false) {
   $('#cameraState').textContent = state;
@@ -139,12 +141,27 @@ function showCameraPlaceholder(message) {
   videoStream.hidden = true;
   streamPlaceholder.hidden = false;
   streamError.hidden = true;
-  $('#cameraNote').textContent = message || 'Для настоящей трансляции нужен адрес видеопотока с вашей камеры.';
+  $('#cameraNote').textContent = message || 'По умолчанию сайт берёт MJPEG с этой Raspberry Pi: /stream.';
   setCameraStatus('Источник не подключён', false);
 }
 
+function normalizeStreamUrl(url) {
+  const cleaned = url.trim();
+  if (!cleaned) return '';
+  if (cleaned.startsWith('/')) return `${window.location.origin}${cleaned}`;
+  return cleaned;
+}
+
+function scheduleStreamRetry() {
+  clearTimeout(streamRetryTimer);
+  streamRetryTimer = setTimeout(() => {
+    if (streamConnected || streamType !== 'mjpeg' || !cameraUrl) return;
+    mjpegStream.src = `${cameraUrl}${cameraUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
+  }, 4000);
+}
+
 function connectCamera(url, type, persist = true) {
-  const cleanedUrl = url.trim();
+  const cleanedUrl = normalizeStreamUrl(url);
   if (!cleanedUrl) {
     showCameraPlaceholder('Добавьте адрес видеопотока в настройках.');
     return;
@@ -153,23 +170,26 @@ function connectCamera(url, type, persist = true) {
     const parsed = new URL(cleanedUrl);
     if (!['http:', 'https:', 'blob:'].includes(parsed.protocol)) throw new Error('Unsupported protocol');
   } catch {
-    showToast('Проверь адрес камеры: нужен полный адрес, начинающийся с http:// или https://');
+    showToast('Проверь адрес камеры: нужен /stream или полный http:// адрес');
     return;
   }
 
+  clearTimeout(streamRetryTimer);
   cameraUrl = cleanedUrl;
   streamType = type;
   if (persist) {
     localStorage.setItem('radio-nanny-camera-url', cameraUrl);
     localStorage.setItem('radio-nanny-stream-type', streamType);
   }
-  $('#streamUrl').value = cameraUrl;
+  $('#streamUrl').value = cameraUrl === localStreamUrl ? '/stream' : cameraUrl;
   $('#streamType').value = streamType;
-  $('#quickStreamUrl').value = cameraUrl;
+  $('#quickStreamUrl').value = $('#streamUrl').value;
   $('#quickStreamType').value = streamType;
   streamPlaceholder.hidden = true;
   streamError.hidden = true;
-  $('#cameraNote').textContent = 'Ожидаю первый кадр от камеры. Если он не появится, проверьте адрес и доступность устройства в сети.';
+  $('#cameraNote').textContent = cameraUrl === localStreamUrl
+    ? 'Ожидаю первый кадр с CSI-камеры Raspberry Pi…'
+    : 'Ожидаю первый кадр от камеры. Если он не появится, проверьте адрес и доступность устройства.';
   setCameraStatus('Подключение…', false);
 
   if (type === 'video') {
@@ -184,7 +204,7 @@ function connectCamera(url, type, persist = true) {
     videoStream.removeAttribute('src');
     videoStream.load();
     mjpegStream.hidden = false;
-    mjpegStream.src = cameraUrl;
+    mjpegStream.src = `${cameraUrl}${cameraUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
   }
 }
 
@@ -193,12 +213,18 @@ mjpegStream.addEventListener('load', () => {
   streamPlaceholder.hidden = true;
   streamError.hidden = true;
   setCameraStatus('Прямой эфир', true);
-  $('#cameraNote').textContent = 'Поток камеры отображается в браузере.';
+  $('#cameraNote').textContent = cameraUrl === localStreamUrl
+    ? 'Трансляция с камеры по шлейфу (CSI) на этой Raspberry Pi.'
+    : 'Поток камеры отображается в браузере.';
 });
 mjpegStream.addEventListener('error', () => {
   if (streamType !== 'mjpeg') return;
   streamError.hidden = false;
   setCameraStatus('Не удалось подключиться', false);
+  $('#cameraNote').textContent = cameraUrl === localStreamUrl
+    ? 'Локальная камера не отвечает. Проверьте шлейф, включение камеры и пакет python3-picamera2.'
+    : 'Не удалось получить видеопоток. Проверьте адрес камеры.';
+  scheduleStreamRetry();
 });
 videoStream.addEventListener('loadeddata', () => {
   if (streamType !== 'video') return;
@@ -215,7 +241,7 @@ videoStream.addEventListener('error', () => {
 
 const connectDialog = $('#connectDialog');
 function openCameraDialog() {
-  $('#quickStreamUrl').value = $('#streamUrl').value || cameraUrl;
+  $('#quickStreamUrl').value = $('#streamUrl').value || '/stream';
   $('#quickStreamType').value = $('#streamType').value || streamType;
   connectDialog.showModal();
 }
@@ -223,6 +249,12 @@ $('#connectCameraBtn').addEventListener('click', openCameraDialog);
 $('#cameraForm').addEventListener('submit', event => {
   event.preventDefault();
   connectCamera($('#streamUrl').value, $('#streamType').value);
+});
+$('#useLocalCameraBtn')?.addEventListener('click', () => {
+  localStorage.removeItem('radio-nanny-camera-url');
+  localStorage.setItem('radio-nanny-stream-type', 'mjpeg');
+  connectCamera('/stream', 'mjpeg', false);
+  showToast('Подключаю локальную CSI-камеру (/stream)');
 });
 $('#quickCameraForm').addEventListener('submit', event => {
   event.preventDefault();
@@ -233,12 +265,29 @@ $('#quickCameraForm').addEventListener('submit', event => {
 const savedCameraUrl = localStorage.getItem('radio-nanny-camera-url');
 const savedStreamType = localStorage.getItem('radio-nanny-stream-type');
 if (savedCameraUrl) {
-  $('#streamUrl').value = savedCameraUrl;
+  $('#streamUrl').value = savedCameraUrl === localStreamUrl ? '/stream' : savedCameraUrl;
   $('#streamType').value = savedStreamType || 'mjpeg';
   connectCamera(savedCameraUrl, savedStreamType || 'mjpeg', false);
 } else {
-  showCameraPlaceholder();
+  connectCamera('/stream', 'mjpeg', false);
 }
+
+async function refreshLocalCameraStatus() {
+  try {
+    const response = await fetch('/api/camera', { cache: 'no-store' });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (cameraUrl !== localStreamUrl || streamConnected) return;
+    if (payload.error) {
+      $('#cameraNote').textContent = payload.error;
+      setCameraStatus('Камера недоступна', false);
+    }
+  } catch {
+    // ignore — stream endpoint is the source of truth for live video
+  }
+}
+refreshLocalCameraStatus();
+setInterval(refreshLocalCameraStatus, 8000);
 
 function toggleFullscreen() {
   const target = cameraStage;
