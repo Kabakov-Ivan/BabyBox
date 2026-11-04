@@ -52,7 +52,7 @@
             <div class="camera-illustration" id="streamPlaceholder">
               <div class="room-glow"></div><div class="moon-shape"></div>
               <div class="crib-illustration"><div class="crib-head"></div><div class="crib-mattress"></div><div class="crib-rail rail-one"></div><div class="crib-rail rail-two"></div><div class="sleeping-baby">z<sup>z</sup></div></div>
-              <div class="placeholder-copy"><span class="camera-placeholder-icon">▣</span><b>Видеопоток пока не подключён</b><span>Добавьте адрес камеры в настройках</span><button class="button button-primary" id="connectCameraBtn" type="button">Подключить камеру</button></div>
+              <div class="placeholder-copy"><span class="camera-placeholder-icon">▣</span><b>Подключение к камере…</b><span>Ищем поток с CSI-камеры BabyBox</span><button class="button button-primary" id="connectCameraBtn" type="button">Указать другой адрес</button></div>
             </div>
             <img class="stream-media" id="mjpegStream" alt="Трансляция с камеры" hidden>
             <video class="stream-media" id="videoStream" playsinline autoplay muted controls hidden></video>
@@ -65,7 +65,7 @@
               <button class="night-control" id="nightVisionBtn" type="button" aria-pressed="false"><span>☾</span> Ночное видение <i></i></button>
             </div>
           </div>
-          <p class="camera-note" id="cameraNote">Для настоящей трансляции нужен адрес видеопотока с вашей камеры.</p>
+          <p class="camera-note" id="cameraNote">По умолчанию сайт берёт MJPEG с этой Raspberry Pi: <code>/stream</code>.</p>
         </section>
 
         <section class="panel sensors-panel" id="sensors" aria-labelledby="sensorsTitle">
@@ -110,10 +110,11 @@
         <div class="panel-heading compact-heading"><div class="heading-title"><span class="section-symbol">⚙</span><div><h2 id="settingsTitle">Подключение</h2><p>Настройки камеры и контроллера</p></div></div></div>
         <div class="settings-grid">
           <form id="cameraForm" class="setting-block">
-            <div><h3>Видеокамера</h3><p>Укажите URL потока. Для MJPEG обычно подходит адрес вида <code>http://адрес-камеры/video</code>.</p></div>
+            <div><h3>Видеокамера</h3><p>Локальная камера по шлейфу отдаётся как MJPEG на <code>/stream</code>. Можно указать другой URL, если поток идёт с другого устройства.</p></div>
             <label>Формат потока<select id="streamType"><option value="mjpeg">MJPEG (изображение)</option><option value="video">Видеофайл или видеопоток</option></select></label>
-            <label>Адрес потока<input id="streamUrl" type="url" inputmode="url" placeholder="http://192.168.4.1:81/stream" autocomplete="url"></label>
+            <label>Адрес потока<input id="streamUrl" type="url" inputmode="url" placeholder="/stream" autocomplete="url"></label>
             <button class="button button-primary" type="submit">Подключить видеопоток</button>
+            <button class="button button-secondary" id="useLocalCameraBtn" type="button">Снова локальная камера</button>
           </form>
           <form id="deviceForm" class="setting-block">
             <div><h3>Плата и датчики</h3><p>Адрес программы-посредника, которая читает данные с платы и отдаёт их сайту.</p></div>
@@ -129,8 +130,8 @@
 
   <dialog class="connect-dialog" id="connectDialog">
     <form method="dialog" class="dialog-close-row"><button class="icon-button" value="close" aria-label="Закрыть">×</button></form>
-    <span class="dialog-icon">▣</span><h2>Подключить камеру</h2><p>Вставьте адрес видеопотока с камеры. Его можно изменить позже в разделе «Настройки».</p>
-    <form id="quickCameraForm"><label>Тип потока<select id="quickStreamType"><option value="mjpeg">MJPEG</option><option value="video">Видеопоток</option></select></label><label>URL камеры<input id="quickStreamUrl" type="url" placeholder="http://192.168.4.1:81/stream" required></label><button class="button button-primary" type="submit">Подключить</button></form>
+    <span class="dialog-icon">▣</span><h2>Подключить камеру</h2><p>По умолчанию используется локальный поток <code>/stream</code>. Укажите другой адрес только если камера на другом устройстве.</p>
+    <form id="quickCameraForm"><label>Тип потока<select id="quickStreamType"><option value="mjpeg">MJPEG</option><option value="video">Видеопоток</option></select></label><label>URL камеры<input id="quickStreamUrl" type="url" placeholder="/stream" required></label><button class="button button-primary" type="submit">Подключить</button></form>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../static/script.js"></script>

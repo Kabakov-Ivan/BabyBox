@@ -19,11 +19,16 @@ fi
 
 if [ ! -x "${APP_DIR}/.venv/bin/python" ]; then
   echo "Missing venv at ${APP_DIR}/.venv — create it first" >&2
+  echo "  python3 -m venv --system-site-packages ${APP_DIR}/.venv" >&2
+  echo "  ${APP_DIR}/.venv/bin/pip install flask" >&2
   exit 1
 fi
 
 apt-get update
-apt-get install -y hostapd dnsmasq
+apt-get install -y hostapd dnsmasq python3-picamera2
+
+# CSI camera access for the web service user
+usermod -aG video "$USER_NAME" 2>/dev/null || true
 
 install -m 755 "${ROOT}/scripts/babybox-boot-wifi" /usr/local/sbin/babybox-boot-wifi
 install -m 755 "${ROOT}/scripts/babybox-wifi" /usr/local/sbin/babybox-wifi
@@ -93,3 +98,9 @@ echo "Flow:"
 echo "  1) Boot → always AP BABY_BOX_SETUP / Sas23766732 + website"
 echo "  2) Phone → http://192.168.4.1:5000/wifi → enter home Wi-Fi"
 echo "  3) Pi joins home Wi-Fi → site on that network IP:5000"
+echo "  4) Camera page auto-loads MJPEG from http://<pi-ip>:5000/stream"
+echo
+echo "Camera notes:"
+echo "  - venv must see system picamera2: python3 -m venv --system-site-packages ${APP_DIR}/.venv"
+echo "  - user ${USER_NAME} is in group video (re-login/reboot after first install)"
+echo "  - quick check: rpicam-hello -t 2000"

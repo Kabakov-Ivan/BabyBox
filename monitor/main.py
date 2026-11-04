@@ -1,11 +1,14 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 import subprocess
 import re
 import json
 import threading
 import time
 
+from camera_stream import BOUNDARY, camera
+
 app = Flask(__name__)
+BOUNDARY_NAME = BOUNDARY.decode("ascii")
 
 
 def run_nmcli(args, timeout=20):
@@ -51,6 +54,28 @@ def index():
 @app.route("/wifi")
 def wifi_setup():
     return render_template("wifi_setup.html")
+
+
+@app.route("/api/camera")
+def api_camera():
+    """Camera status for the web panel (auto-connect uses /stream)."""
+    if not camera.available:
+        camera.start()
+    return jsonify(camera.status())
+
+
+@app.route("/stream")
+def video_stream():
+    """MJPEG multipart stream from the CSI / ribbon-cable Pi Camera."""
+    return Response(
+        camera.mjpeg_generator(),
+        mimetype=f"multipart/x-mixed-replace; boundary={BOUNDARY_NAME}",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @app.route("/wifi/networks")
