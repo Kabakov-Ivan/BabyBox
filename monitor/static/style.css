@@ -228,6 +228,76 @@ video.stream-media { object-fit: contain; }
 .connect-dialog label { display: grid; gap: 5px; color: #aebbd0; font-size: 10px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); border: 0; }
 
+/* Компактный экран приложения и отдельные разделы. */
+.app-shell { grid-template-columns: 190px minmax(0, 1fr); }
+.dashboard { max-width: none; padding: 15px 18px; }
+.page-heading { margin-bottom: 12px; }
+.dashboard > .top-grid, .dashboard > .bottom-grid { display: contents; }
+.dashboard { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(340px, 1fr); align-content: start; gap: 12px; }
+.dashboard > .page-heading { grid-column: 1 / -1; }
+.camera-panel { grid-column: 1; grid-row: 2; }
+.sensors-panel { grid-column: 2; grid-row: 2; }
+.controls-panel { grid-column: 1 / -1; grid-row: 3; }
+.events-panel { display: none; }
+.camera-stage { height: clamp(300px, 43vh, 465px); min-height: 280px; }
+.sensor-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.sensor-card { min-height: 93px; padding: 9px 10px 14px; }
+.sensor-card strong { margin-top: 5px; font-size: 20px; }
+.sensor-icon { width: 26px; height: 26px; }
+.sensor-footnote { margin-top: 6px; }
+.control-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.control-tile { min-height: 70px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 9px 13px; }
+.control-icon { flex: 0 0 auto; }
+.control-tile b, .control-tile small { text-align: left; }
+.control-tile small { margin-left: auto; }
+.volume-row { padding-top: 11px; }
+.controls-note { margin-top: 6px; }
+.recordings-panel, .reports-view { grid-column: 1 / -1; grid-row: 2; width: 100%; }
+.report-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.report-card { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); }
+.report-card span, .report-card small { color: var(--muted); font-size: 11px; }
+.report-card strong { font-size: 28px; }
+.report-events { padding-bottom: 12px; }
+.reports-view .event-list { max-height: 55vh; overflow: auto; }
+.page-footer { grid-column: 1 / -1; }
+body[data-view="home"] .page-footer { display: none; }
+@media (max-width: 1080px) {
+  .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .camera-panel { grid-column: 1 / -1; grid-row: auto; }
+  .sensors-panel { grid-column: 1 / -1; grid-row: auto; }
+  .controls-panel { grid-column: 1 / -1; grid-row: auto; }
+  .camera-stage { height: clamp(240px, 38vw, 340px); }
+}
+@media (max-width: 700px) {
+  .app-shell { display: block; }
+  .sidebar { position: sticky; top: 66px; width: 100%; height: auto; min-height: 0; }
+  .dashboard { display: block; padding: 14px 11px 20px; }
+  .dashboard > .page-heading { margin-bottom: 12px; }
+  .dashboard > .camera-panel, .dashboard > .sensors-panel, .dashboard > .controls-panel { margin: 0 0 11px; }
+  .camera-stage { height: 270px; }
+  .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Иконки используют единый контурный стиль с одинаковой толщиной линий. */
+.nav-item > span svg, .section-symbol svg, .sensor-icon svg, .control-icon svg,
+.camera-placeholder-icon svg, .round-control svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nav-item > span svg { width: 19px; height: 19px; }
+.section-symbol svg { margin: auto; }
+.sensor-icon { display: inline-grid; place-items: center; }
+.sensor-icon svg { width: 17px; height: 17px; stroke-width: 1.9; }
+.control-icon svg { width: 23px; height: 23px; }
+.camera-placeholder-icon svg { width: 20px; height: 20px; }
+.round-control svg { width: 18px; height: 18px; }
+
 body[data-theme="light"] {
   color-scheme: light;
   --page: #edf2f8;
