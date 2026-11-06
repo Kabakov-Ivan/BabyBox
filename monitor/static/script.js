@@ -19,13 +19,8 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 1000);
 
-const demoReadings = {
-  temp_c: '22.4',
-  humidity_pct: '48',
-  co2_ppm: '612',
-  noise_db: '32',
-  motion: 'Нет',
-  respiration_bpm: '16'
+const emptyReadings = {
+  temp_c: '—', humidity_pct: '—', co2_ppm: '—', noise_db: '—', motion: '—', respiration_bpm: '—'
 };
 
 function setReading(key, value, live = false) {
@@ -35,15 +30,17 @@ function setReading(key, value, live = false) {
     ? (value === true || value === 1 || value === 'true' || value === 'yes' || value === 'Да' ? 'Да' : 'Нет')
     : String(value);
   target.textContent = display;
+  const reportTarget = $(`[data-report="${key}"]`);
+  if (reportTarget) reportTarget.textContent = display;
   const state = $(`[data-state="${key}"]`);
   if (state) {
-    state.textContent = live ? 'От устройства' : 'Демо';
+    state.textContent = live ? 'От устройства' : 'Нет данных';
     state.classList.toggle('live-state', live);
   }
 }
 
-function restoreDemoReadings() {
-  Object.entries(demoReadings).forEach(([key, value]) => setReading(key, value, false));
+function restoreEmptyReadings() {
+  Object.entries(emptyReadings).forEach(([key, value]) => setReading(key, value, false));
 }
 
 function addEvent(title, detail, tone = '') {
@@ -65,38 +62,41 @@ function addEvent(title, detail, tone = '') {
   copy.append(heading, caption);
   row.append(time, mark, copy);
   $('#eventList').prepend(row);
+  const reportRow = row.cloneNode(true);
+  $('#reportEventList')?.querySelector('.empty-events')?.remove();
+  $('#reportEventList')?.prepend(reportRow);
+  $('#dailyEventCount').textContent = $('#eventList').querySelectorAll('.event-row').length;
 }
-
-[
-  ['Показания датчиков — пример', 'Демонстрационные значения', 'cyan'],
-  ['Обнаружено движение', 'Детская · пример события', 'green'],
-  ['Уровень шума изменился', '32 дБ · демонстрационные данные', ''],
-  ['Контроллер ожидает подключения', 'Подключение настраивается ниже', 'orange']
-].forEach(([title, detail, tone]) => addEvent(title, detail, tone));
 
 $('#clearEventsBtn').addEventListener('click', () => {
   $('#eventList').replaceChildren();
+  $('#reportEventList')?.replaceChildren();
+  $('#dailyEventCount').textContent = '0';
   const empty = document.createElement('div');
   empty.className = 'empty-events';
   empty.textContent = 'Новых событий пока нет';
   $('#eventList').append(empty);
+  $('#reportEventList')?.append(empty.cloneNode(true));
 });
 
-// Навигация перемещает по разделам этой страницы.
+// Переключение экранов приложения.
 const navLinks = $$('.nav-item');
-navLinks.forEach(link => link.addEventListener('click', () => {
-  navLinks.forEach(item => item.classList.toggle('active', item === link));
-}));
-if ('IntersectionObserver' in window) {
-  const trackedSections = ['dashboard', 'camera', 'sensors', 'recordings', 'settings']
-    .map(id => document.getElementById(id)).filter(Boolean);
-  const sectionObserver = new IntersectionObserver(entries => {
-    const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-    if (!visible) return;
-    navLinks.forEach(link => link.classList.toggle('active', link.hash === `#${visible.target.id}`));
-  }, { rootMargin: '-18% 0px -68% 0px', threshold: [0, .1, .25] });
-  trackedSections.forEach(section => sectionObserver.observe(section));
+const dashboardHeading = $('.page-heading', $('#dashboard'));
+const homePanels = [dashboardHeading, $('.top-grid'), $('.bottom-grid')];
+const recordingsPanel = $('.recordings-panel');
+const reportsPanel = $('#reports');
+function setView(view) {
+  homePanels.forEach(panel => { if (panel) panel.hidden = view !== 'home'; });
+  recordingsPanel.hidden = view !== 'recordings';
+  reportsPanel.hidden = view !== 'reports';
+  navLinks.forEach(link => link.classList.toggle('active', link.dataset.view === view));
+  document.body.dataset.view = view;
+  history.replaceState(null, '', `#${view === 'home' ? 'dashboard' : view}`);
 }
+navLinks.forEach(link => link.addEventListener('click', event => {
+  event.preventDefault(); setView(link.dataset.view);
+}));
+setView(location.hash === '#reports' ? 'reports' : location.hash === '#recordings' ? 'recordings' : 'home');
 
 // Тема сохраняется в этом браузере.
 const savedTheme = localStorage.getItem('radio-nanny-theme');
@@ -115,11 +115,9 @@ const streamPlaceholder = $('#streamPlaceholder');
 const mjpegStream = $('#mjpegStream');
 const videoStream = $('#videoStream');
 const streamError = $('#streamError');
-const localStreamUrl = `${window.location.origin}/stream`;
 let cameraUrl = '';
 let streamType = 'mjpeg';
 let streamConnected = false;
-let streamRetryTimer = null;
 
 function setCameraStatus(state, live = false) {
   $('#cameraState').textContent = state;
@@ -141,27 +139,12 @@ function showCameraPlaceholder(message) {
   videoStream.hidden = true;
   streamPlaceholder.hidden = false;
   streamError.hidden = true;
-  $('#cameraNote').textContent = message || 'По умолчанию сайт берёт MJPEG с этой Raspberry Pi: /stream.';
+  $('#cameraNote').textContent = message || 'Для настоящей трансляции нужен адрес видеопотока с вашей камеры.';
   setCameraStatus('Источник не подключён', false);
 }
 
-function normalizeStreamUrl(url) {
-  const cleaned = url.trim();
-  if (!cleaned) return '';
-  if (cleaned.startsWith('/')) return `${window.location.origin}${cleaned}`;
-  return cleaned;
-}
-
-function scheduleStreamRetry() {
-  clearTimeout(streamRetryTimer);
-  streamRetryTimer = setTimeout(() => {
-    if (streamConnected || streamType !== 'mjpeg' || !cameraUrl) return;
-    mjpegStream.src = `${cameraUrl}${cameraUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
-  }, 4000);
-}
-
 function connectCamera(url, type, persist = true) {
-  const cleanedUrl = normalizeStreamUrl(url);
+  const cleanedUrl = url.trim();
   if (!cleanedUrl) {
     showCameraPlaceholder('Добавьте адрес видеопотока в настройках.');
     return;
@@ -170,26 +153,23 @@ function connectCamera(url, type, persist = true) {
     const parsed = new URL(cleanedUrl);
     if (!['http:', 'https:', 'blob:'].includes(parsed.protocol)) throw new Error('Unsupported protocol');
   } catch {
-    showToast('Проверь адрес камеры: нужен /stream или полный http:// адрес');
+    showToast('Проверь адрес камеры: нужен полный адрес, начинающийся с http:// или https://');
     return;
   }
 
-  clearTimeout(streamRetryTimer);
   cameraUrl = cleanedUrl;
   streamType = type;
   if (persist) {
     localStorage.setItem('radio-nanny-camera-url', cameraUrl);
     localStorage.setItem('radio-nanny-stream-type', streamType);
   }
-  $('#streamUrl').value = cameraUrl === localStreamUrl ? '/stream' : cameraUrl;
+  $('#streamUrl').value = cameraUrl;
   $('#streamType').value = streamType;
-  $('#quickStreamUrl').value = $('#streamUrl').value;
+  $('#quickStreamUrl').value = cameraUrl;
   $('#quickStreamType').value = streamType;
   streamPlaceholder.hidden = true;
   streamError.hidden = true;
-  $('#cameraNote').textContent = cameraUrl === localStreamUrl
-    ? 'Ожидаю первый кадр с CSI-камеры Raspberry Pi…'
-    : 'Ожидаю первый кадр от камеры. Если он не появится, проверьте адрес и доступность устройства.';
+  $('#cameraNote').textContent = 'Ожидаю первый кадр от камеры. Если он не появится, проверьте адрес и доступность устройства в сети.';
   setCameraStatus('Подключение…', false);
 
   if (type === 'video') {
@@ -204,7 +184,7 @@ function connectCamera(url, type, persist = true) {
     videoStream.removeAttribute('src');
     videoStream.load();
     mjpegStream.hidden = false;
-    mjpegStream.src = `${cameraUrl}${cameraUrl.includes('?') ? '&' : '?'}_=${Date.now()}`;
+    mjpegStream.src = cameraUrl;
   }
 }
 
@@ -213,18 +193,12 @@ mjpegStream.addEventListener('load', () => {
   streamPlaceholder.hidden = true;
   streamError.hidden = true;
   setCameraStatus('Прямой эфир', true);
-  $('#cameraNote').textContent = cameraUrl === localStreamUrl
-    ? 'Трансляция с камеры по шлейфу (CSI) на этой Raspberry Pi.'
-    : 'Поток камеры отображается в браузере.';
+  $('#cameraNote').textContent = 'Поток камеры отображается в браузере.';
 });
 mjpegStream.addEventListener('error', () => {
   if (streamType !== 'mjpeg') return;
   streamError.hidden = false;
   setCameraStatus('Не удалось подключиться', false);
-  $('#cameraNote').textContent = cameraUrl === localStreamUrl
-    ? 'Локальная камера не отвечает. Проверьте шлейф, включение камеры и пакет python3-picamera2.'
-    : 'Не удалось получить видеопоток. Проверьте адрес камеры.';
-  scheduleStreamRetry();
 });
 videoStream.addEventListener('loadeddata', () => {
   if (streamType !== 'video') return;
@@ -241,7 +215,7 @@ videoStream.addEventListener('error', () => {
 
 const connectDialog = $('#connectDialog');
 function openCameraDialog() {
-  $('#quickStreamUrl').value = $('#streamUrl').value || '/stream';
+  $('#quickStreamUrl').value = $('#streamUrl').value || cameraUrl;
   $('#quickStreamType').value = $('#streamType').value || streamType;
   connectDialog.showModal();
 }
@@ -249,12 +223,6 @@ $('#connectCameraBtn').addEventListener('click', openCameraDialog);
 $('#cameraForm').addEventListener('submit', event => {
   event.preventDefault();
   connectCamera($('#streamUrl').value, $('#streamType').value);
-});
-$('#useLocalCameraBtn')?.addEventListener('click', () => {
-  localStorage.removeItem('radio-nanny-camera-url');
-  localStorage.setItem('radio-nanny-stream-type', 'mjpeg');
-  connectCamera('/stream', 'mjpeg', false);
-  showToast('Подключаю локальную CSI-камеру (/stream)');
 });
 $('#quickCameraForm').addEventListener('submit', event => {
   event.preventDefault();
@@ -265,29 +233,12 @@ $('#quickCameraForm').addEventListener('submit', event => {
 const savedCameraUrl = localStorage.getItem('radio-nanny-camera-url');
 const savedStreamType = localStorage.getItem('radio-nanny-stream-type');
 if (savedCameraUrl) {
-  $('#streamUrl').value = savedCameraUrl === localStreamUrl ? '/stream' : savedCameraUrl;
+  $('#streamUrl').value = savedCameraUrl;
   $('#streamType').value = savedStreamType || 'mjpeg';
   connectCamera(savedCameraUrl, savedStreamType || 'mjpeg', false);
 } else {
-  connectCamera('/stream', 'mjpeg', false);
+  showCameraPlaceholder();
 }
-
-async function refreshLocalCameraStatus() {
-  try {
-    const response = await fetch('/api/camera', { cache: 'no-store' });
-    if (!response.ok) return;
-    const payload = await response.json();
-    if (cameraUrl !== localStreamUrl || streamConnected) return;
-    if (payload.error) {
-      $('#cameraNote').textContent = payload.error;
-      setCameraStatus('Камера недоступна', false);
-    }
-  } catch {
-    // ignore — stream endpoint is the source of truth for live video
-  }
-}
-refreshLocalCameraStatus();
-setInterval(refreshLocalCameraStatus, 8000);
 
 function toggleFullscreen() {
   const target = cameraStage;
@@ -312,7 +263,7 @@ $('#nightVisionBtn').addEventListener('click', event => {
   const nightTile = $('.control-tile[data-action="night_mode"]');
   nightTile.setAttribute('aria-pressed', String(enabled));
   nightTile.querySelector('.control-state').textContent = enabled ? 'Включён' : 'Выключен';
-  showToast(enabled ? 'Ночной режим отображения включён (демо)' : 'Ночной режим отображения выключен');
+  showToast(enabled ? 'Ночной режим отображения включён' : 'Ночной режим отображения выключен');
 });
 
 $('#snapshotBtn').addEventListener('click', () => {
@@ -393,7 +344,7 @@ function saveRecording() {
   showToast('Запись готова. Скачай её в разделе «Записи».');
 }
 
-// В демо звуковые примеры играют в браузере. После подключения API команды отправляются плате.
+// Звуковые примеры воспроизводятся в браузере. При подключении API команды отправляются плате.
 let audioContext = null;
 let masterGain = null;
 let audioNodes = [];
@@ -467,12 +418,12 @@ if (apiBase) $('#apiUrl').value = apiBase;
 function setDeviceConnection(online, message) {
   apiOnline = online;
   $('#connectionPill').classList.toggle('is-offline', !online);
-  $('#connectionText').textContent = online ? 'Устройство онлайн' : (message || 'Демо-режим');
+  $('#connectionText').textContent = online ? 'Устройство онлайн' : (message || 'Нет связи');
   $('#deviceDot').classList.toggle('online', online);
   $('#deviceState').textContent = online ? 'Устройство онлайн' : 'Нет подключения';
   $('#dataLabel').classList.toggle('live', online);
-  $('#dataLabel').innerHTML = online ? '<i></i>Показания с устройства' : '<i></i>Показаны демонстрационные данные';
-  $('#eventsSubtitle').textContent = online ? 'События устройства' : 'Примеры для макета';
+  $('#dataLabel').innerHTML = online ? '<i></i>Показания с устройства' : '<i></i>Ожидание данных устройства';
+  $('#eventsSubtitle').textContent = online ? 'События за сутки' : 'События за сутки';
   $('#controlsNote').textContent = online
     ? 'Команды отправляются контроллеру через настроенный API.'
     : 'Звук воспроизводится в браузере. Команды на устройство отправляются только после подключения программы.';
@@ -510,7 +461,7 @@ async function pollDevice(showFailure = false) {
     return true;
   } catch (error) {
     setDeviceConnection(false, 'Нет связи');
-    restoreDemoReadings();
+  restoreEmptyReadings();
     $('.battery').textContent = '—';
     if (showFailure) showToast('Не получилось получить /api/status. Проверь адрес, работу программы и доступ браузера к API.');
     return false;
@@ -536,10 +487,10 @@ $('#deviceForm').addEventListener('submit', event => {
     apiBase = '';
     apiOnline = false;
     localStorage.removeItem('radio-nanny-api-url');
-    restoreDemoReadings();
-    setDeviceConnection(false, 'Демо-режим');
+    restoreEmptyReadings();
+    setDeviceConnection(false, 'Нет связи');
     $('.battery').textContent = '—';
-    showToast('Подключение к устройству отключено. Показаны примеры.');
+    showToast('Подключение к устройству отключено.');
     return;
   }
   try {
@@ -605,8 +556,8 @@ $$('.control-tile').forEach(button => {
       $('#nightVisionBtn').setAttribute('aria-pressed', String(enabling));
       cameraStage.classList.toggle('night-on', enabling);
     }
-    addEvent(`${label}: ${enabling ? 'включено' : 'выключено'}`, apiOnline ? 'Команда отправлена устройству' : 'Изменение в демонстрационном интерфейсе', enabling ? 'green' : '');
-    showToast(`${label} ${enabling ? (apiOnline ? 'включено на устройстве' : 'включено в демо') : 'выключено'}`);
+    addEvent(`${label}: ${enabling ? 'включено' : 'выключено'}`, apiOnline ? 'Команда отправлена устройству' : 'Изменение в интерфейсе', enabling ? 'green' : '');
+    showToast(`${label} ${enabling ? (apiOnline ? 'включено на устройстве' : 'включено') : 'выключено'}`);
   });
 });
 
@@ -619,5 +570,5 @@ $('#volumeSlider').addEventListener('change', async event => {
   if (apiOnline) await sendCommand('volume', true, { volume: Number(event.currentTarget.value) });
 });
 
-setDeviceConnection(false, apiBase ? 'Проверка связи' : 'Демо-режим');
+setDeviceConnection(false, apiBase ? 'Проверка связи' : 'Нет связи');
 if (apiBase) startPolling();
