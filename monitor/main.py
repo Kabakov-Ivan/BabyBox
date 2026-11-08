@@ -1,14 +1,21 @@
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_from_directory
 import subprocess
 import re
 import json
 import threading
 import time
+from pathlib import Path
 
 from camera_stream import BOUNDARY, camera
 
 app = Flask(__name__)
 BOUNDARY_NAME = BOUNDARY.decode("ascii")
+IMG_DIR = Path(__file__).resolve().parent / "img"
+
+
+@app.route("/img/<path:filename>")
+def img_files(filename):
+    return send_from_directory(IMG_DIR, filename)
 
 
 def run_nmcli(args, timeout=20):
