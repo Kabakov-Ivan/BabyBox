@@ -3,110 +3,305 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101827">
+  <meta name="theme-color" content="#121417">
   <title>Настройка BabyBox</title>
+  <link rel="icon" href="../img/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
+    :root {
+      color-scheme: dark;
+      --page: #121417;
+      --panel: #1a1e23;
+      --panel-soft: #22272e;
+      --panel-hover: #2a3038;
+      --border: #2e353e;
+      --line-soft: #3a424c;
+      --text: #eef0f3;
+      --muted: #8b939e;
+      --accent: #b0b8c4;
+      --btn-primary: #8e97a4;
+      --btn-primary-hover: #a0a8b4;
+      --glow-a: 160 168 180;
+      --glow-b: 120 128 138;
+      --shadow: 0 18px 55px rgb(0 0 0 / 28%);
+      --font: "Manrope", "Segoe UI", sans-serif;
+    }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      padding: 24px 16px;
+      min-width: 320px;
       min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
       place-items: center;
-      background: #101827;
-      color: #f1f5f9;
-      font-family: Arial, sans-serif;
+      padding: 28px 20px 36px;
+      background:
+        radial-gradient(ellipse at 12% -10%, rgb(var(--glow-a) / 12%), transparent 42%),
+        radial-gradient(ellipse at 90% 0%, rgb(var(--glow-b) / 10%), transparent 36%),
+        var(--page);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.45;
     }
+
+    button, input, select { font: inherit; }
+    button { color: inherit; cursor: pointer; }
+    button:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
     .card {
       width: 100%;
-      max-width: 420px;
+      max-width: 440px;
       padding: 28px;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      background: #1e293b;
-      box-shadow: 0 20px 60px #0004;
+      border: 1px solid var(--line-soft);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
     }
-    .logo {
-      width: 52px;
-      height: 52px;
-      display: grid;
-      place-items: center;
-      border-radius: 15px;
-      background: #38bdf8;
-      color: #082f49;
-      font-size: 26px;
-      font-weight: bold;
+
+    .brand-logo {
+      display: block;
+      height: 30px;
+      width: auto;
+      margin: 0 0 22px;
     }
-    h1 { margin: 20px 0 8px; font-size: 26px; }
-    p { color: #cbd5e1; line-height: 1.5; }
+
+    .card-eyebrow {
+      margin: 0 0 10px;
+      color: #a8b0ba;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(24px, 5vw, 30px);
+      font-weight: 800;
+      letter-spacing: -.6px;
+      line-height: 1.15;
+    }
+
+    .lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
     label {
       display: block;
-      margin: 18px 0 8px;
-      font-size: 14px;
-      font-weight: bold;
+      margin: 0 0 8px;
+      color: #c2c8d0;
+      font-size: 13px;
+      font-weight: 700;
     }
-    select, input {
+
+    .field { margin-bottom: 16px; }
+
+    .password-field {
+      position: relative;
+    }
+
+    input {
       width: 100%;
-      padding: 13px;
-      border: 1px solid #475569;
-      border-radius: 10px;
-      background: #0f172a;
-      color: white;
+      min-height: 46px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-soft);
+      color: var(--text);
       font-size: 16px;
+      transition: border-color .18s, background .18s;
     }
-    button {
-      width: 100%;
-      margin-top: 20px;
-      padding: 14px;
+
+    .password-field input {
+      padding-right: 48px;
+    }
+
+    input:hover {
+      border-color: #4a5360;
+      background: var(--panel-hover);
+    }
+
+    input:focus {
+      border-color: #6b7380;
+      background: var(--panel-hover);
+    }
+
+    .password-toggle {
+      position: absolute;
+      top: 50%;
+      right: 6px;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
       border: 0;
       border-radius: 10px;
-      background: #38bdf8;
-      color: #082f49;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      transform: translateY(-50%);
+      transition: color .18s, background .18s;
     }
-    button:disabled { opacity: .6; cursor: wait; }
-    .hint { font-size: 13px; color: #94a3b8; }
-    #message { margin-top: 16px; overflow-wrap: anywhere; }
+
+    .password-toggle:hover {
+      color: var(--text);
+      background: rgb(255 255 255 / 6%);
+    }
+
+    .password-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .password-toggle .icon-hide { display: none; }
+    .password-toggle.is-shown .icon-show { display: none; }
+    .password-toggle.is-shown .icon-hide { display: block; }
+
+    button[type="submit"] {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 6px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--btn-primary);
+      color: #121417;
+      font-size: 15px;
+      font-weight: 750;
+      transition: background .18s, transform .15s, opacity .18s;
+    }
+
+    button[type="submit"]:hover:not(:disabled) {
+      background: var(--btn-primary-hover);
+    }
+
+    button[type="submit"]:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    button[type="submit"]:disabled {
+      opacity: .55;
+      cursor: wait;
+    }
+
+    #message {
+      margin: 18px 0 0;
+      min-height: 1.4em;
+      color: #c2c8d0;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        align-items: stretch;
+        padding: 16px 14px 24px;
+      }
+
+      .card {
+        max-width: none;
+        padding: 20px 16px;
+        border-radius: 16px;
+      }
+
+      .brand-logo {
+        height: 24px;
+        margin-bottom: 18px;
+      }
+
+      h1 { font-size: 24px; }
+
+      .lead { margin-bottom: 18px; font-size: 13px; }
+
+      input { min-height: 48px; }
+
+      button[type="submit"] {
+        min-height: 50px;
+        font-size: 15px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .card { padding: 18px 14px; }
+      h1 { font-size: 22px; }
+      .brand-logo { height: 22px; }
+    }
   </style>
 </head>
 <body>
   <main class="card">
-    <div class="logo">B</div>
+    <img class="brand-logo" src="../img/logo_white.svg" alt="BabyBox" width="160" height="31">
+    <p class="card-eyebrow">Wi-Fi</p>
     <h1>Настройка BabyBox</h1>
-    <p>Подключите радионяню к домашней Wi-Fi сети, чтобы открывать мониторинг с телефона.</p>
+    <p class="lead">Подключите радионяню к домашней Wi-Fi сети, чтобы открывать мониторинг с вашего устройства.</p>
 
     <form id="wifiForm">
-      <label for="ssid">Имя домашней Wi-Fi сети (SSID)</label>
-      <input id="ssid" name="ssid" type="text"
-             autocomplete="off"
-             required
-             placeholder="Например: Home_WiFi"
-             maxlength="32">
+      <div class="field">
+        <label for="ssid">Имя домашней Wi-Fi сети</label>
+        <input id="ssid" name="ssid" type="text"
+               autocomplete="off"
+               required
+               maxlength="32">
+      </div>
 
-      <label for="password">Пароль Wi-Fi</label>
-      <input id="password" name="password" type="password"
-             autocomplete="current-password"
-             placeholder="Введите пароль сети"
-             maxlength="63">
+      <div class="field">
+        <label for="password">Пароль Wi-Fi</label>
+        <div class="password-field">
+          <input id="password" name="password" type="password"
+                 autocomplete="current-password"
+                 maxlength="63">
+          <button class="password-toggle" id="passwordToggle" type="button"
+                  aria-label="Показать пароль" aria-pressed="false" title="Показать пароль">
+            <svg class="icon-show" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="icon-hide" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 3l18 18M10.7 10.7A3 3 0 0 0 12 15a3 3 0 0 0 2.3-1.3M9.9 5.1A11.4 11.4 0 0 1 12 5c6.5 0 10 7 10 7a18.4 18.4 0 0 1-4.2 4.6M6.1 6.1A18.5 18.5 0 0 0 2 12s3.5 7 10 7a11.6 11.6 0 0 0 4-.7"/>
+            </svg>
+          </button>
+        </div>
+      </div>
 
       <button type="submit" id="connectBtn">Подключить BabyBox</button>
     </form>
 
-    <p class="hint">
-      Пока BabyBox раздаёт свою сеть, список чужих Wi-Fi недоступен —
-      введите имя домашней сети вручную. После подключения точка настройки
-      отключится: подключите телефон к той же домашней сети.
-    </p>
     <p id="message" role="status"></p>
   </main>
 
   <script>
     const ssidInput = document.getElementById('ssid');
     const passwordInput = document.getElementById('password');
+    const passwordToggle = document.getElementById('passwordToggle');
     const message = document.getElementById('message');
     const connectBtn = document.getElementById('connectBtn');
+
+    passwordToggle.addEventListener('click', () => {
+      const shown = passwordInput.type === 'password';
+      passwordInput.type = shown ? 'text' : 'password';
+      passwordToggle.classList.toggle('is-shown', shown);
+      passwordToggle.setAttribute('aria-pressed', shown ? 'true' : 'false');
+      passwordToggle.setAttribute('aria-label', shown ? 'Скрыть пароль' : 'Показать пароль');
+      passwordToggle.title = shown ? 'Скрыть пароль' : 'Показать пароль';
+    });
 
     document.getElementById('wifiForm').addEventListener('submit', async event => {
       event.preventDefault();
