@@ -81,7 +81,6 @@ def api_camera():
 @app.route("/api/status")
 def api_status():
     """Live sensor readings for the web panel (temperature / humidity)."""
-    dht.start()
     return jsonify(dht.status())
 
 
@@ -170,6 +169,4 @@ def wifi_connect():
 
 
 if __name__ == "__main__":
-    # Start DHT worker before Flask threads exist (avoids fork+thread hangs).
-    dht.start()
     app.run(host="0.0.0.0", port=5000, threaded=True)
