@@ -19,8 +19,8 @@ app = Flask(
 BOUNDARY_NAME = BOUNDARY.decode("ascii")
 IMG_DIR = MONITOR_ROOT / "img"
 
-# Start DHT-11 reader in the background (physical pin 7 / BCM GPIO 4).
-dht.start()
+# Kick off DHT-11 in a background thread so Flask never blocks on GPIO/Blinka.
+threading.Thread(target=dht.start, name="dht11-autostart", daemon=True).start()
 
 
 @app.route("/img/<path:filename>")

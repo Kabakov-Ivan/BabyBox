@@ -23,8 +23,10 @@ class DhtSensor:
         self._lock = threading.Lock()
         self._device = None
         self._thread: Optional[threading.Thread] = None
+        self._boot_thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
         self._started = False
+        self._booting = False
         self._disabled = False
         self._error: Optional[str] = None
         self._temperature_c: Optional[float] = None
@@ -42,6 +44,7 @@ class DhtSensor:
                 "gpio_bcm": self.bcm_pin,
                 "available": self.available,
                 "started": self._started,
+                "booting": self._booting,
                 "error": self._error,
                 "updated_at": self._updated_at,
             }
@@ -54,45 +57,67 @@ class DhtSensor:
             return payload
 
     def start(self) -> bool:
+        """Kick off DHT init in a background thread (never blocks the web server)."""
         with self._lock:
-            if self._disabled:
-                return False
-            if self._started and self._error is None:
-                return True
-            if self._started:
-                self._stop_unlocked()
+            if self._disabled or self._started or self._booting:
+                return self._started and not self._disabled
+            self._booting = True
+            self._boot_thread = threading.Thread(
+                target=self._boot,
+                name="dht11-boot",
+                daemon=True,
+            )
+            self._boot_thread.start()
+            return True
 
-            try:
-                import adafruit_dht
-                import board
-            except ImportError as exc:
+    def _boot(self) -> None:
+        try:
+            import adafruit_dht
+            import board
+        except ImportError as exc:
+            with self._lock:
                 self._disabled = True
+                self._booting = False
                 self._error = (
                     "DHT library missing — "
                     "pip install adafruit-circuitpython-dht Adafruit-Blinka"
                 )
-                log.warning("%s (%s)", self._error, exc)
-                return False
-
-            pin = getattr(board, f"D{self.bcm_pin}", None)
-            if pin is None:
+            log.warning("%s (%s)", self._error, exc)
+            return
+        except Exception as exc:
+            with self._lock:
                 self._disabled = True
+                self._booting = False
+                self._error = f"DHT import failed: {exc}"
+            log.exception(self._error)
+            return
+
+        pin = getattr(board, f"D{self.bcm_pin}", None)
+        if pin is None:
+            with self._lock:
+                self._disabled = True
+                self._booting = False
                 self._error = f"GPIO BCM {self.bcm_pin} is not available on this board"
-                log.error(self._error)
-                return False
+            log.error(self._error)
+            return
 
-            try:
-                # use_pulseio=False is more reliable on recent Raspberry Pi OS.
-                self._device = adafruit_dht.DHT11(pin, use_pulseio=False)
-            except Exception as exc:
+        try:
+            # use_pulseio=False is more reliable on recent Raspberry Pi OS.
+            device = adafruit_dht.DHT11(pin, use_pulseio=False)
+        except Exception as exc:
+            with self._lock:
                 self._disabled = True
+                self._booting = False
                 self._error = f"Failed to open DHT-11 on GPIO {self.bcm_pin}: {exc}"
-                log.exception(self._error)
                 self._device = None
-                return False
+            log.exception(self._error)
+            return
 
+        with self._lock:
+            self._device = device
             self._error = None
             self._started = True
+            self._booting = False
             self._stop.clear()
             self._thread = threading.Thread(
                 target=self._poll_loop,
@@ -100,8 +125,7 @@ class DhtSensor:
                 daemon=True,
             )
             self._thread.start()
-            log.info("DHT-11 reader started on BCM GPIO %s", self.bcm_pin)
-            return True
+        log.info("DHT-11 reader started on BCM GPIO %s", self.bcm_pin)
 
     def stop(self) -> None:
         with self._lock:
@@ -114,7 +138,9 @@ class DhtSensor:
         self._thread = None
         self._device = None
         self._started = False
+        self._booting = False
         if thread and thread.is_alive() and thread is not threading.current_thread():
+            # Join outside would be safer; keep short to avoid hanging stop().
             thread.join(timeout=2.0)
         if device is not None:
             try:
@@ -127,7 +153,8 @@ class DhtSensor:
             self._read_once()
 
     def _read_once(self) -> None:
-        device = self._device
+        with self._lock:
+            device = self._device
         if device is None:
             return
 
@@ -137,7 +164,7 @@ class DhtSensor:
                 temperature = device.temperature
                 humidity = device.humidity
                 if temperature is None or humidity is None:
-                    last_error = "DHT-11 вернул пустые значения"
+                    last_error = "DHT-11 returned empty values"
                     time.sleep(0.2)
                     continue
                 with self._lock:
