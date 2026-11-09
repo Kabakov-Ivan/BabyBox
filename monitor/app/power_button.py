@@ -1,9 +1,10 @@
-"""Power button on BCM GPIO3 (phys pin 5) ↔ GND (phys pin 20).
+"""Optional power-button watcher (fallback).
 
-GPIO3 is a special pin (fixed pull-up / I2C SCL) — gpiozero/lgpio often cannot
-claim it. We poll level via `pinctrl` instead.
+Prefer kernel overlay instead — see scripts/enable-power-button.sh:
+  dtoverlay=gpio-shutdown,gpio_pin=3
 
-Press+hold → shutdown. Shorting GPIO3 to GND while halted still wakes the Pi.
+This process must NOT spawn pinctrl in a tight loop (it freezes the Pi).
+Default poll is slow; set POWER_BTN_POLL_SEC only if you know what you are doing.
 """
 
 from __future__ import annotations
@@ -22,8 +23,9 @@ logging.basicConfig(
 log = logging.getLogger("power_button")
 
 BCM_PIN = int(os.environ.get("POWER_BTN_BCM", "3"))
-HOLD_SEC = float(os.environ.get("POWER_BTN_HOLD_SEC", "0.8"))
-POLL_SEC = float(os.environ.get("POWER_BTN_POLL_SEC", "0.05"))
+HOLD_SEC = float(os.environ.get("POWER_BTN_HOLD_SEC", "1.0"))
+# Keep this high — each read is a subprocess.
+POLL_SEC = float(os.environ.get("POWER_BTN_POLL_SEC", "0.35"))
 
 
 def read_level(pin: int) -> int | None:
@@ -32,7 +34,7 @@ def read_level(pin: int) -> int | None:
             ["pinctrl", "get", str(pin)],
             text=True,
             stderr=subprocess.STDOUT,
-            timeout=1,
+            timeout=0.4,
         )
     except FileNotFoundError:
         log.error("pinctrl not found. Install: sudo apt install -y raspi-utils")
@@ -41,9 +43,6 @@ def read_level(pin: int) -> int | None:
         log.warning("pinctrl get failed: %s", exc)
         return None
 
-    # Formats seen across Pi OS builds:
-    #   "3: ip ... | hi // GPIO3 = input"
-    #   "... level=1 ..."
     match = re.search(r"level=(\d)", out)
     if match:
         return int(match.group(1))
@@ -51,7 +50,6 @@ def read_level(pin: int) -> int | None:
         return 1
     if re.search(r"\|\s*lo\b", out, re.IGNORECASE):
         return 0
-    log.warning("unexpected pinctrl output: %r", out.strip())
     return None
 
 
@@ -61,58 +59,52 @@ def shutdown() -> None:
 
 
 def main() -> int:
-    # Make sure pin is an input with pull-up (safe if already so).
+    log.warning(
+        "Userspace power button is a fallback. Prefer dtoverlay=gpio-shutdown "
+        "(see enable-power-button.sh). Polling every %.2fs.",
+        POLL_SEC,
+    )
     try:
         subprocess.run(
             ["pinctrl", "set", str(BCM_PIN), "ip", "pu"],
             check=False,
             capture_output=True,
             text=True,
-            timeout=1,
+            timeout=0.4,
         )
-    except Exception as exc:
-        log.warning("pinctrl set skipped: %s", exc)
+    except Exception:
+        pass
 
     level = read_level(BCM_PIN)
     if level is None:
         return 1
 
-    log.info(
-        "Listening BCM GPIO %s via pinctrl (level=%s). Hold ~%.1fs to shutdown.",
-        BCM_PIN,
-        level,
-        HOLD_SEC,
-    )
-
+    log.info("Listening BCM GPIO %s (level=%s). Hold ~%.1fs.", BCM_PIN, level, HOLD_SEC)
     pressed_since: float | None = None
     last_level = level
 
     while True:
         level = read_level(BCM_PIN)
         if level is None:
-            time.sleep(0.5)
+            time.sleep(1.0)
             continue
 
         if level != last_level:
-            log.info("GPIO%s level %s → %s", BCM_PIN, last_level, level)
+            log.info("GPIO%s %s → %s", BCM_PIN, last_level, level)
             last_level = level
 
-        # Active low: pressed = 0 (to GND)
         if level == 0:
             now = time.monotonic()
             if pressed_since is None:
                 pressed_since = now
-                log.info("button pressed")
             elif now - pressed_since >= HOLD_SEC:
                 shutdown()
                 time.sleep(60)
                 pressed_since = None
         else:
-            if pressed_since is not None:
-                log.info("button released")
             pressed_since = None
 
-        time.sleep(POLL_SEC)
+        time.sleep(max(POLL_SEC, 0.2))
 
 
 if __name__ == "__main__":

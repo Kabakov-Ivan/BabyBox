@@ -24,6 +24,7 @@ KEEP_DAYS = int(os.environ.get("BABYBOX_SENSOR_KEEP_DAYS", "14"))
 
 _lock = threading.Lock()
 _last_sample_at = 0.0
+_last_cleanup_at = 0.0
 
 
 def _day_path(day: date) -> Path:
@@ -51,7 +52,11 @@ def append_sample(temp_c: float, humidity_pct: float, *, force: bool = False) ->
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, ensure_ascii=True) + "\n")
         _last_sample_at = now
-        _cleanup_old_files()
+        # Cleanup at most once per hour — not on every sample.
+        global _last_cleanup_at
+        if now - _last_cleanup_at > 3600:
+            _last_cleanup_at = now
+            _cleanup_old_files()
         return True
 
 

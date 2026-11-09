@@ -135,7 +135,7 @@ def loop_iio() -> int:
                 }
             )
             append_sample(temperature, humidity)
-            log.info("ok temp=%sC humidity=%s%%", temperature, humidity)
+            log.debug("ok temp=%sC humidity=%s%%", temperature, humidity)
         except Exception as exc:
             fails += 1
             log.warning("IIO read failed (%s): %s", fails, exc)
@@ -205,7 +205,7 @@ def loop_adafruit() -> int:
                 }
             )
             append_sample(float(temperature), float(humidity))
-            log.info("ok temp=%sC humidity=%s%%", temperature, humidity)
+            log.debug("ok temp=%sC humidity=%s%%", temperature, humidity)
         except Exception as exc:
             fails += 1
             log.warning("read failed (%s): %s", fails, exc)

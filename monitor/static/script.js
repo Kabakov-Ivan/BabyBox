@@ -878,7 +878,7 @@ function startPolling(announce = false) {
   pollDevice(announce).then(connected => {
     if (announce && connected) showToast('Показания устройства подключены.');
   });
-  apiTimer = setInterval(() => pollDevice(false), 2500);
+  apiTimer = setInterval(() => pollDevice(false), 4000);
 }
 
 $('#deviceForm').addEventListener('submit', event => {
