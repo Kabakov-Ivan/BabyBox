@@ -18,6 +18,8 @@ logging.basicConfig(
 log = logging.getLogger("dht_worker")
 
 BCM_PIN = int(os.environ.get("DHT_BCM_PIN", "4"))
+# 11 = DHT11, 22 = DHT22/AM2302 (некоторые модули подписаны неверно)
+DHT_MODEL = os.environ.get("DHT_MODEL", "11").strip()
 INTERVAL_SEC = float(os.environ.get("DHT_INTERVAL_SEC", "3"))
 OUT_PATH = Path(os.environ.get("DHT_STATUS_FILE", "/tmp/babybox-dht.json"))
 
@@ -75,14 +77,18 @@ def main() -> int:
 
     try:
         # use_pulseio=False works more often on Raspberry Pi OS / Bookworm.
-        device = adafruit_dht.DHT11(pin, use_pulseio=False)
+        sensor_cls = adafruit_dht.DHT22 if DHT_MODEL == "22" else adafruit_dht.DHT11
+        device = sensor_cls(pin, use_pulseio=False)
     except Exception as exc:
         log.exception("open failed")
         write_status({"available": False, "booting": False, "error": f"open failed: {exc}"})
         return 1
 
+    # First read right after open is often empty — give the bus a moment.
+    time.sleep(2)
+
     write_status({"available": False, "booting": True, "started": True, "error": None})
-    log.info("device opened, reading every %ss", INTERVAL_SEC)
+    log.info("device opened (DHT%s) on BCM %s, reading every %ss", DHT_MODEL, BCM_PIN, INTERVAL_SEC)
 
     fails = 0
     while True:
