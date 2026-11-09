@@ -23,8 +23,11 @@ BabyBox/
 │
 └── monitor/                          ← всё приложение
     │
-    ├── main.py                       ← сервер, API, вся логика
-    ├── camera_stream.py              ← поток с камеры
+    ├── app/                          ← весь Python-код
+    │   ├── main.py                   ← сервер, API
+    │   ├── camera_stream.py          ← поток с камеры
+    │   └── dht_sensor.py             ← DHT-11 (темп / влажность)
+    │
     ├── requirements.txt              ← Python-зависимости
     │
     ├── templates/                    ← HTML-страницы

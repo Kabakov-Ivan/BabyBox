@@ -486,12 +486,16 @@ function applyDevicePayload(payload) {
   });
 }
 
+function statusEndpoint() {
+  // Пустой apiBase = тот же хост, с которого открыт сайт (Raspberry Pi).
+  return apiBase ? `${apiBase}/api/status` : '/api/status';
+}
+
 async function pollDevice(showFailure = false) {
-  if (!apiBase) return false;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 4500);
   try {
-    const response = await fetch(`${apiBase}/api/status`, { cache: 'no-store', signal: controller.signal });
+    const response = await fetch(statusEndpoint(), { cache: 'no-store', signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     applyDevicePayload(payload);
@@ -507,10 +511,10 @@ async function pollDevice(showFailure = false) {
   }
 }
 
-function startPolling() {
+function startPolling(announce = false) {
   clearInterval(apiTimer);
-  pollDevice(true).then(connected => {
-    if (connected) showToast('Показания устройства подключены.');
+  pollDevice(announce).then(connected => {
+    if (announce && connected) showToast('Показания устройства подключены.');
   });
   apiTimer = setInterval(() => pollDevice(false), 2500);
 }
@@ -519,14 +523,10 @@ $('#deviceForm').addEventListener('submit', event => {
   event.preventDefault();
   const value = $('#apiUrl').value.trim().replace(/\/+$/, '');
   if (!value) {
-    clearInterval(apiTimer);
-    apiTimer = null;
     apiBase = '';
-    apiOnline = false;
     localStorage.removeItem('radio-nanny-api-url');
-    restoreEmptyReadings();
-    setDeviceConnection(false);
-    showToast('Подключение к устройству отключено.');
+    startPolling(true);
+    showToast('Показания с этого устройства.');
     return;
   }
   try {
@@ -538,7 +538,7 @@ $('#deviceForm').addEventListener('submit', event => {
   }
   apiBase = value;
   localStorage.setItem('radio-nanny-api-url', apiBase);
-  startPolling();
+  startPolling(true);
 });
 
 async function sendCommand(action, enabled, extra = {}) {
@@ -604,4 +604,4 @@ $$('.control-tile:not(:disabled)').forEach(button => {
 });
 
 setDeviceConnection(false);
-if (apiBase) startPolling();
+startPolling(false);

@@ -7,10 +7,20 @@ import time
 from pathlib import Path
 
 from camera_stream import BOUNDARY, camera
+from dht_sensor import dht
 
-app = Flask(__name__)
+MONITOR_ROOT = Path(__file__).resolve().parent.parent
+
+app = Flask(
+    __name__,
+    template_folder=str(MONITOR_ROOT / "templates"),
+    static_folder=str(MONITOR_ROOT / "static"),
+)
 BOUNDARY_NAME = BOUNDARY.decode("ascii")
-IMG_DIR = Path(__file__).resolve().parent / "img"
+IMG_DIR = MONITOR_ROOT / "img"
+
+# Start DHT-11 reader in the background (physical pin 7 / BCM GPIO 4).
+dht.start()
 
 
 @app.route("/img/<path:filename>")
@@ -69,6 +79,14 @@ def api_camera():
     if not camera.available:
         camera.start()
     return jsonify(camera.status())
+
+
+@app.route("/api/status")
+def api_status():
+    """Live sensor readings for the web panel (temperature / humidity)."""
+    if not dht.available:
+        dht.start()
+    return jsonify(dht.status())
 
 
 @app.route("/stream")

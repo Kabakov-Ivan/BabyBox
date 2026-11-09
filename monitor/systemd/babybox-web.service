@@ -7,9 +7,9 @@ Wants=babybox-boot-wifi.service
 Type=simple
 User=admin
 Group=admin
-WorkingDirectory=/home/admin/BabyBox/monitor
+WorkingDirectory=/home/admin/BabyBox/monitor/app
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/main.py
+ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/main.py
 Restart=always
 RestartSec=3
 

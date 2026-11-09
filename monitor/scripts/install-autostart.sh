@@ -17,18 +17,26 @@ if [ ! -d "$APP_DIR" ]; then
   exit 1
 fi
 
+if [ ! -f "${APP_DIR}/app/main.py" ]; then
+  echo "Expected ${APP_DIR}/app/main.py" >&2
+  exit 1
+fi
+
 if [ ! -x "${APP_DIR}/.venv/bin/python" ]; then
   echo "Missing venv at ${APP_DIR}/.venv — create it first" >&2
   echo "  python3 -m venv --system-site-packages ${APP_DIR}/.venv" >&2
-  echo "  ${APP_DIR}/.venv/bin/pip install flask" >&2
+  echo "  ${APP_DIR}/.venv/bin/pip install -r ${APP_DIR}/requirements.txt" >&2
   exit 1
 fi
 
 apt-get update
-apt-get install -y hostapd dnsmasq python3-picamera2
+apt-get install -y hostapd dnsmasq python3-picamera2 libgpiod2
 
-# CSI camera access for the web service user
-usermod -aG video "$USER_NAME" 2>/dev/null || true
+# Flask + DHT-11 libraries inside the app venv
+"${APP_DIR}/.venv/bin/pip" install -r "${APP_DIR}/requirements.txt"
+
+# CSI camera / GPIO access for the web service user
+usermod -aG video,gpio "$USER_NAME" 2>/dev/null || true
 
 install -m 755 "${ROOT}/scripts/babybox-boot-wifi" /usr/local/sbin/babybox-boot-wifi
 install -m 755 "${ROOT}/scripts/babybox-wifi" /usr/local/sbin/babybox-wifi
@@ -102,5 +110,9 @@ echo "  4) Camera page auto-loads MJPEG from http://<pi-ip>:5000/stream"
 echo
 echo "Camera notes:"
 echo "  - venv must see system picamera2: python3 -m venv --system-site-packages ${APP_DIR}/.venv"
-echo "  - user ${USER_NAME} is in group video (re-login/reboot after first install)"
+echo "  - user ${USER_NAME} is in groups video,gpio (re-login/reboot after first install)"
 echo "  - quick check: rpicam-hello -t 2000"
+echo
+echo "DHT-11 notes:"
+echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
+echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
