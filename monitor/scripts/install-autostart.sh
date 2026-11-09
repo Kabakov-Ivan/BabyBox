@@ -145,7 +145,7 @@ if [ -n "$BOOTCFG" ]; then
   fi
 fi
 
-apt-get install -y python3-gpiozero
+apt-get install -y raspi-utils
 sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g" \
   "${ROOT}/systemd/babybox-power.service" > /etc/systemd/system/babybox-power.service
 systemctl enable babybox-power.service
