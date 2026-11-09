@@ -709,7 +709,10 @@ h1, h2, h3, p { margin-top: 0; }
   fill: none;
   stroke: var(--accent);
   stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+  transition: d .35s ease;
 }
 .humidity-line path { stroke: #58a5ff; }
 .co2-line path { stroke: #52d7c9; }

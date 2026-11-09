@@ -35,6 +35,70 @@ const emptyReadings = {
   temp_c: '—', humidity_pct: '—', co2_ppm: '—'
 };
 
+// ~2.5s poll × 24 ≈ последняя минута показаний
+const SPARK_POINTS = 24;
+const sparkHistory = {
+  temp_c: [],
+  humidity_pct: [],
+  co2_ppm: []
+};
+
+function sparkPathFromValues(values) {
+  if (!values.length) return '';
+  const width = 100;
+  const height = 24;
+  const padY = 3;
+  let min = Math.min(...values);
+  let max = Math.max(...values);
+  // Чуть растягиваем шкалу, чтобы мелкие изменения были видны
+  if (max - min < 0.4) {
+    const mid = (min + max) / 2;
+    min = mid - 0.2;
+    max = mid + 0.2;
+  }
+  const range = max - min || 1;
+  const stepX = values.length === 1 ? 0 : width / (values.length - 1);
+  const points = values.map((value, index) => {
+    const x = index * stepX;
+    const y = padY + (height - padY * 2) * (1 - (value - min) / range);
+    return [x, y];
+  });
+  if (points.length === 1) {
+    const [, y] = points[0];
+    return `M0 ${y.toFixed(2)} L${width} ${y.toFixed(2)}`;
+  }
+  let d = `M${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
+  for (let i = 1; i < points.length; i += 1) {
+    const [x0, y0] = points[i - 1];
+    const [x1, y1] = points[i];
+    const cx = (x0 + x1) / 2;
+    d += ` Q${cx.toFixed(2)} ${y0.toFixed(2)} ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+  return d;
+}
+
+function drawSpark(key) {
+  const path = $(`[data-spark="${key}"]`);
+  if (!path) return;
+  path.setAttribute('d', sparkPathFromValues(sparkHistory[key] || []));
+}
+
+function pushSparkSample(key, value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || !sparkHistory[key]) return;
+  const hist = sparkHistory[key];
+  hist.push(num);
+  if (hist.length > SPARK_POINTS) hist.shift();
+  drawSpark(key);
+}
+
+function clearSparks() {
+  Object.keys(sparkHistory).forEach(key => {
+    sparkHistory[key] = [];
+    drawSpark(key);
+  });
+}
+
 function setReading(key, value, live = false) {
   const target = $(`[data-reading="${key}"]`);
   if (!target || value === undefined || value === null || value === '') return;
@@ -47,9 +111,15 @@ function setReading(key, value, live = false) {
     state.textContent = live ? 'Онлайн' : 'Офлайн';
     state.classList.toggle('live-state', live);
   }
+  if (live) pushSparkSample(key, value);
+  else if (sparkHistory[key]) {
+    sparkHistory[key] = [];
+    drawSpark(key);
+  }
 }
 
 function restoreEmptyReadings() {
+  clearSparks();
   Object.entries(emptyReadings).forEach(([key, value]) => setReading(key, value, false));
 }
 
