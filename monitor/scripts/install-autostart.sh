@@ -116,8 +116,22 @@ echo "  - venv must see system picamera2: python3 -m venv --system-site-packages
 echo "  - user ${USER_NAME} is in groups video,gpio (re-login/reboot after first install)"
 echo "  - quick check: rpicam-hello -t 2000"
 echo
+# Kernel DHT driver (more reliable than userspace bitbang on Pi)
+if [ -f /boot/firmware/config.txt ]; then
+  BOOTCFG=/boot/firmware/config.txt
+elif [ -f /boot/config.txt ]; then
+  BOOTCFG=/boot/config.txt
+else
+  BOOTCFG=""
+fi
+if [ -n "$BOOTCFG" ] && ! grep -q 'dtoverlay=dht11' "$BOOTCFG"; then
+  echo 'dtoverlay=dht11,gpiopin=17' >> "$BOOTCFG"
+  echo "Added dtoverlay=dht11,gpiopin=17 to $BOOTCFG (reboot required once)"
+fi
+
 echo "DHT-11 notes:"
-echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
+echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 11 (BCM GPIO 17)"
+echo "  - kernel overlay: dtoverlay=dht11,gpiopin=17"
 echo "  - separate service: sudo systemctl status babybox-dht"
 echo "  - check file: cat /tmp/babybox-dht.json"
 echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
