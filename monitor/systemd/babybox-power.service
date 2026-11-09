@@ -1,0 +1,18 @@
+[Unit]
+Description=BabyBox power button (GPIO3)
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/admin/BabyBox/monitor/app
+Environment=PYTHONUNBUFFERED=1
+Environment=POWER_BTN_BCM=3
+Environment=POWER_BTN_HOLD_SEC=0.8
+# System gpiozero (lgpio) — not the app venv
+ExecStart=/usr/bin/python3 /home/admin/BabyBox/monitor/app/power_button.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

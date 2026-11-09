@@ -138,14 +138,17 @@ if [ -n "$BOOTCFG" ]; then
   fi
   echo "DHT overlay set to dtoverlay=dht11,gpiopin=4 in $BOOTCFG (reboot if pin changed)"
 
-  # Power button: GPIO3 (pin 5) ↔ GND (pin 20). Same pin wakes Pi from halt.
-  if grep -q 'dtoverlay=gpio-shutdown' "$BOOTCFG"; then
-    sed -i 's/^dtoverlay=gpio-shutdown.*/dtoverlay=gpio-shutdown,gpio_pin=3,active_low=1,gpio_pull=up/' "$BOOTCFG"
-  else
-    echo 'dtoverlay=gpio-shutdown,gpio_pin=3,active_low=1,gpio_pull=up' >> "$BOOTCFG"
+  # Power button uses userspace service (see enable-power-button.sh), not overlay.
+  if grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG"; then
+    sed -i '/^dtoverlay=gpio-shutdown/d' "$BOOTCFG"
+    echo "Removed dtoverlay=gpio-shutdown (using babybox-power.service)"
   fi
-  echo "Power-button overlay set (GPIO3) in $BOOTCFG"
 fi
+
+apt-get install -y python3-gpiozero
+sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g" \
+  "${ROOT}/systemd/babybox-power.service" > /etc/systemd/system/babybox-power.service
+systemctl enable babybox-power.service
 
 echo "DHT-11 notes:"
 echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
@@ -156,5 +159,6 @@ echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
 echo
 echo "Power button notes:"
 echo "  - Button: GPIO3 (phys pin 5) ↔ GND (phys pin 20)"
-echo "  - Press while running → shutdown"
+echo "  - Hold ~0.8s while running → shutdown (babybox-power.service)"
 echo "  - Press while halted → power on"
+echo "  - status: sudo systemctl status babybox-power"
