@@ -44,6 +44,8 @@ install -m 755 "${ROOT}/scripts/babybox-wifi" /usr/local/sbin/babybox-wifi
 install -m 644 "${ROOT}/systemd/babybox-boot-wifi.service" /etc/systemd/system/babybox-boot-wifi.service
 sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
   "${ROOT}/systemd/babybox-web.service" > /etc/systemd/system/babybox-web.service
+sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
+  "${ROOT}/systemd/babybox-dht.service" > /etc/systemd/system/babybox-dht.service
 
 # hostapd / dnsmasq only started by boot script or restore_ap — not always-on
 systemctl disable --now hostapd 2>/dev/null || true
@@ -97,6 +99,7 @@ chmod 440 /etc/sudoers.d/babybox-wifi
 systemctl daemon-reload
 systemctl enable babybox-boot-wifi.service
 systemctl enable babybox-web.service
+systemctl enable babybox-dht.service
 
 echo
 echo "Installed. Reboot to test:"
@@ -115,4 +118,6 @@ echo "  - quick check: rpicam-hello -t 2000"
 echo
 echo "DHT-11 notes:"
 echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
+echo "  - separate service: sudo systemctl status babybox-dht"
+echo "  - check file: cat /tmp/babybox-dht.json"
 echo "  - check API: curl -s http://127.0.0.1:5000/api/status"

@@ -1,7 +1,7 @@
 [Unit]
 Description=BabyBox web monitor
 After=network.target babybox-boot-wifi.service
-Wants=babybox-boot-wifi.service
+Wants=babybox-boot-wifi.service babybox-dht.service
 
 [Service]
 Type=simple
