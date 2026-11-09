@@ -21,13 +21,17 @@ class StreamingOutput(io.BufferedIOBase):
 
     def __init__(self) -> None:
         self.frame: Optional[bytes] = None
+        self.seq = 0
         self.condition = threading.Condition()
 
     def write(self, buf: bytes) -> int:  # type: ignore[override]
+        # Copy: picamera2 reuses the encoder buffer between frames.
+        data = bytes(buf)
         with self.condition:
-            self.frame = buf
+            self.frame = data
+            self.seq += 1
             self.condition.notify_all()
-        return len(buf)
+        return len(data)
 
 
 class CameraStream:
@@ -173,15 +177,11 @@ class CameraStream:
         return None
 
     def start_clip(self, path: Path) -> tuple[bool, str]:
-        """Record live JPEG frames into an MP4 via ffmpeg (stream keeps running)."""
+        """Record live JPEG frames into a video file (stream keeps running)."""
         if self._recording:
             return False, "Запись уже идёт"
         if not self.start() or self._output is None:
             return False, self._error or "Камера недоступна"
-        if not shutil.which("ffmpeg"):
-            return False, (
-                "На Raspberry Pi нужен ffmpeg: sudo apt install -y ffmpeg"
-            )
 
         path.parent.mkdir(parents=True, exist_ok=True)
         self._record_stop.clear()
@@ -199,12 +199,20 @@ class CameraStream:
         return True, "Запись началась"
 
     def stop_clip(self) -> tuple[bool, Optional[Path], str]:
-        if not self._recording:
-            return False, None, "Запись не активна"
+        if not self._recording and not (
+            self._record_thread and self._record_thread.is_alive()
+        ):
+            # Thread may have just finished finalizing — still collect the file.
+            if self._record_path and self._record_path.exists() and not self._record_error:
+                path = self._record_path
+                self._record_path = None
+                return True, path, "Запись сохранена"
+            return False, None, self._record_error or "Запись не активна"
+
         self._record_stop.set()
         thread = self._record_thread
         if thread and thread.is_alive():
-            thread.join(timeout=20)
+            thread.join(timeout=45)
         path = self._record_path
         error = self._record_error
         self._recording = False
@@ -215,83 +223,110 @@ class CameraStream:
             if path and path.exists():
                 path.unlink(missing_ok=True)
             return False, None, error
-        if path is None or not path.exists() or path.stat().st_size < 1000:
+        if path is None or not path.exists() or path.stat().st_size < 256:
             if path and path.exists():
                 path.unlink(missing_ok=True)
             return False, None, "Файл записи пустой или повреждён"
         return True, path, "Запись сохранена"
 
+    def _next_frame(self, output: StreamingOutput, last_seq: int, timeout: float = 1.0):
+        with output.condition:
+            if output.seq == last_seq:
+                output.condition.wait(timeout=timeout)
+            if output.seq == last_seq or output.frame is None:
+                return last_seq, None
+            return output.seq, output.frame
+
+    def _encode_mjpeg_file(self, src: Path, dest: Path) -> tuple[bool, str]:
+        """Turn a raw MJPEG bitstream into a browser-playable file."""
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            # Keep raw MJPEG if ffmpeg is missing — still openable by some players.
+            try:
+                src.replace(dest.with_suffix(".mjpeg"))
+                self._record_path = dest.with_suffix(".mjpeg")
+                return True, ""
+            except Exception as exc:
+                return False, f"ffmpeg не найден и не удалось сохранить MJPEG: {exc}"
+
+        attempts = [
+            [
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "mjpeg", "-framerate", str(self.fps), "-i", str(src),
+                "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart", str(dest),
+            ],
+            [
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "mjpeg", "-framerate", str(self.fps), "-i", str(src),
+                "-c:v", "mpeg4", "-q:v", "5", str(dest),
+            ],
+            [
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "mjpeg", "-framerate", str(self.fps), "-i", str(src),
+                "-c:v", "copy", str(dest.with_suffix(".avi")),
+            ],
+        ]
+        errors: list[str] = []
+        for cmd in attempts:
+            out = Path(cmd[-1])
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+            except Exception as exc:
+                errors.append(str(exc))
+                continue
+            if result.returncode == 0 and out.exists() and out.stat().st_size > 256:
+                if out != dest:
+                    self._record_path = out
+                return True, ""
+            detail = (result.stderr or result.stdout or "").strip()
+            errors.append(detail or f"ffmpeg code {result.returncode}")
+            out.unlink(missing_ok=True)
+
+        return False, errors[-1] if errors else "Не удалось закодировать видео"
+
     def _record_loop(self, path: Path) -> None:
         assert self._output is not None
         output = self._output
-        cmd = [
-            "ffmpeg",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "image2pipe",
-            "-c:v",
-            "mjpeg",
-            "-framerate",
-            str(self.fps),
-            "-i",
-            "pipe:0",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
-            "-movflags",
-            "+faststart",
-            str(path),
-        ]
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-            )
-        except Exception as exc:
-            self._record_error = f"Не удалось запустить ffmpeg: {exc}"
-            self._recording = False
-            return
-
-        last_frame: Optional[bytes] = None
+        raw_path = path.with_suffix(".mjpeg.part")
         frames = 0
+        last_seq = output.seq
+
         try:
-            assert proc.stdin is not None
-            while not self._record_stop.is_set():
-                with output.condition:
-                    output.condition.wait(timeout=1.0)
-                    frame = output.frame
-                if frame is None or frame is last_frame:
-                    continue
-                last_frame = frame
-                try:
-                    proc.stdin.write(frame)
+            with raw_path.open("wb") as raw:
+                while not self._record_stop.is_set():
+                    last_seq, frame = self._next_frame(output, last_seq, timeout=0.5)
+                    if frame is None:
+                        continue
+                    raw.write(frame)
                     frames += 1
-                except BrokenPipeError:
-                    break
-        finally:
-            try:
-                if proc.stdin:
-                    proc.stdin.close()
-            except Exception:
-                pass
-            try:
-                stderr = proc.communicate(timeout=12)[1]
-            except Exception:
-                proc.kill()
-                stderr = b""
-            if proc.returncode not in (0, None) and frames == 0:
-                detail = (stderr or b"").decode("utf-8", errors="replace").strip()
-                self._record_error = detail or "ffmpeg завершился с ошибкой"
-            elif frames == 0:
+                # Grab one last frame after stop, if a newer one arrived.
+                last_seq, frame = self._next_frame(output, last_seq, timeout=0.05)
+                if frame is not None:
+                    raw.write(frame)
+                    frames += 1
+
+            if frames == 0:
                 self._record_error = "Пока шла запись кадров не было"
+                raw_path.unlink(missing_ok=True)
+                return
+
+            ok, detail = self._encode_mjpeg_file(raw_path, path)
+            if not ok:
+                self._record_error = detail
+                path.unlink(missing_ok=True)
+        except Exception as exc:
+            log.exception("Recording failed")
+            self._record_error = f"Ошибка записи: {exc}"
+            path.unlink(missing_ok=True)
+        finally:
+            raw_path.unlink(missing_ok=True)
             self._recording = False
 
     def mjpeg_generator(self) -> Generator[bytes, None, None]:
