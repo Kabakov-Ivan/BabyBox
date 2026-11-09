@@ -9,7 +9,11 @@ from pathlib import Path
 from camera_stream import BOUNDARY, camera
 from dht_sensor import dht
 from media_store import media_store
+from nightlight import nightlight
 from sensor_history import day_report
+
+# Start with LED off.
+nightlight.set(False)
 
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
 
@@ -83,7 +87,32 @@ def api_camera():
 @app.route("/api/status")
 def api_status():
     """Live sensor readings for the web panel (temperature / humidity)."""
-    return jsonify(dht.status())
+    payload = dht.status()
+    payload.update(nightlight.status())
+    return jsonify(payload)
+
+
+@app.route("/api/control", methods=["POST"])
+def api_control():
+    """Device controls from the web panel (night light, …)."""
+    data = request.get_json(silent=True) or {}
+    action = data.get("action")
+    enabled = bool(data.get("enabled"))
+
+    if action == "light":
+        ok = nightlight.set(enabled)
+        if not ok:
+            return jsonify(
+                error=nightlight.status().get("error") or "Не удалось переключить ночник",
+                light=nightlight.is_on(),
+            ), 500
+        return jsonify(ok=True, action="light", enabled=nightlight.is_on(), **nightlight.status())
+
+    if action == "lullaby":
+        # Sound is handled in the browser for now.
+        return jsonify(ok=True, action="lullaby", enabled=enabled)
+
+    return jsonify(error=f"Unknown action: {action}"), 400
 
 
 @app.route("/api/reports/today")

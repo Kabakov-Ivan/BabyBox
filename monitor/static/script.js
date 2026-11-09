@@ -772,6 +772,15 @@ function applyDevicePayload(payload) {
     if (typeof raw === 'number' && !Number.isFinite(raw)) return;
     setReading(key, raw, true);
   });
+
+  if (Object.hasOwn(payload, 'light')) {
+    const lightBtn = $('.control-tile[data-action="light"]');
+    if (lightBtn) {
+      const on = Boolean(payload.light);
+      setControlState(lightBtn, on);
+      cameraStage?.classList.toggle('light-on', on);
+    }
+  }
 }
 
 function statusEndpoint() {
@@ -910,10 +919,13 @@ $('#deviceForm').addEventListener('submit', event => {
   showToast(apiBase ? 'Подключено к удалённому API.' : 'Показания с этого устройства.');
 });
 
+function controlEndpoint() {
+  return apiBase ? `${apiBase}/api/control` : '/api/control';
+}
+
 async function sendCommand(action, enabled, extra = {}) {
-  if (!apiOnline) return false;
   try {
-    const response = await fetch(`${apiBase}/api/control`, {
+    const response = await fetch(controlEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, enabled, ...extra })
@@ -942,6 +954,15 @@ $$('.control-tile:not(:disabled)').forEach(button => {
     if (action === 'alarm') return;
     const enabling = button.getAttribute('aria-pressed') !== 'true';
 
+    if (action === 'light') {
+      const accepted = await sendCommand(action, enabling);
+      if (!accepted) return;
+      setControlState(button, enabling);
+      cameraStage?.classList.toggle('light-on', enabling);
+      addEvent(`Ночник: ${enabling ? 'включено' : 'выключено'}`, 'Команда отправлена устройству', enabling ? 'green' : '');
+      return;
+    }
+
     if (action === 'lullaby') {
       stopPreview();
       if (!enabling) {
@@ -965,7 +986,6 @@ $$('.control-tile:not(:disabled)').forEach(button => {
     }
 
     setControlState(button, enabling);
-    if (action === 'light') cameraStage.classList.toggle('light-on', enabling);
 
     const label = action === 'lullaby' ? 'Колыбельная' : 'Ночник';
     addEvent(`${label}: ${enabling ? 'включено' : 'выключено'}`, apiOnline ? 'Команда отправлена устройству' : 'Изменение в интерфейсе', enabling ? 'green' : '');
