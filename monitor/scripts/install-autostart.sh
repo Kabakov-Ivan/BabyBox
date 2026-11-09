@@ -138,16 +138,17 @@ if [ -n "$BOOTCFG" ]; then
   fi
   echo "DHT overlay set to dtoverlay=dht11,gpiopin=4 in $BOOTCFG (reboot if pin changed)"
 
-  # Power button via kernel overlay (GPIO3 ↔ GND). Avoid userspace pinctrl spam.
-  systemctl disable --now babybox-power.service 2>/dev/null || true
-  LINE='dtoverlay=gpio-shutdown,gpio_pin=3,active_low=1,gpio_pull=up'
+  # Power button userspace service (pinctrl). Remove kernel overlay if present.
   if grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG"; then
-    sed -i "s/^dtoverlay=gpio-shutdown.*/${LINE}/" "$BOOTCFG"
-  else
-    printf '\n%s\n' "$LINE" >> "$BOOTCFG"
+    sed -i '/^dtoverlay=gpio-shutdown/d' "$BOOTCFG"
+    echo "Removed dtoverlay=gpio-shutdown (using babybox-power.service)"
   fi
-  echo "Power-button overlay set (GPIO3) in $BOOTCFG"
 fi
+
+apt-get install -y raspi-utils
+sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g" \
+  "${ROOT}/systemd/babybox-power.service" > /etc/systemd/system/babybox-power.service
+systemctl enable babybox-power.service
 
 echo "DHT-11 notes:"
 echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
@@ -158,5 +159,5 @@ echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
 echo
 echo "Power button notes:"
 echo "  - Button: GPIO3 (phys pin 5) ↔ GND (phys pin 20)"
-echo "  - dtoverlay=gpio-shutdown (reboot once after install)"
-echo "  - Press while running → shutdown; while halted → power on"
+echo "  - service: sudo systemctl status babybox-power"
+echo "  - Hold ~0.8s → shutdown; press while halted → power on"

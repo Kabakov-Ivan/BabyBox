@@ -1,6 +1,5 @@
 #!/bin/bash
 # Power button: GPIO3 (phys pin 5) ↔ GND (phys pin 20)
-# Uses kernel overlay — does NOT burn CPU with pinctrl polling.
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -8,37 +7,43 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-# Stop the heavy userspace watcher if it was installed earlier.
-systemctl disable --now babybox-power.service 2>/dev/null || true
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+USER_NAME="${SUDO_USER:-admin}"
+HOME_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+APP_DIR="${HOME_DIR}/BabyBox/monitor"
 
+apt-get install -y raspi-utils
+
+# Kernel overlay fights userspace access to GPIO3 — remove it.
 if [ -f /boot/firmware/config.txt ]; then
   BOOTCFG=/boot/firmware/config.txt
 elif [ -f /boot/config.txt ]; then
   BOOTCFG=/boot/config.txt
 else
-  echo "config.txt not found" >&2
-  exit 1
+  BOOTCFG=""
+fi
+if [ -n "$BOOTCFG" ] && grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG"; then
+  sed -i '/^dtoverlay=gpio-shutdown/d' "$BOOTCFG"
+  echo "Removed dtoverlay=gpio-shutdown from $BOOTCFG"
 fi
 
-LINE='dtoverlay=gpio-shutdown,gpio_pin=3,active_low=1,gpio_pull=up'
-
-if grep -q '^dtoverlay=gpio-shutdown' "$BOOTCFG"; then
-  sed -i "s/^dtoverlay=gpio-shutdown.*/${LINE}/" "$BOOTCFG"
-else
-  printf '\n%s\n' "$LINE" >> "$BOOTCFG"
-fi
-
-if grep -qE '^dtparam=i2c_arm=on|^dtparam=i2c=on' "$BOOTCFG"; then
-  echo "WARNING: I2C is enabled — GPIO3 is SCL. Prefer disabling I2C:"
+if [ -n "$BOOTCFG" ] && grep -qE '^dtparam=i2c_arm=on|^dtparam=i2c=on' "$BOOTCFG"; then
+  echo "WARNING: I2C enabled — GPIO3 is SCL. Disable I2C if button fails:"
   echo "  sudo raspi-config → Interface Options → I2C → No"
 fi
 
-echo "Updated $BOOTCFG"
-echo "  $LINE"
+sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g" \
+  "${ROOT}/systemd/babybox-power.service" > /etc/systemd/system/babybox-power.service
+
+systemctl daemon-reload
+systemctl enable --now babybox-power.service
+systemctl restart babybox-power.service
+
 echo
-echo "Userspace babybox-power.service disabled (it was lagging the Pi)."
-echo "Wiring: GPIO3 (pin 5) ↔ GND (pin 20)"
-echo "Reboot required:"
-echo "  sudo reboot"
+echo "Installed babybox-power.service"
+echo "Wiring: left side of button → pin 5 (GPIO3), right side → pin 20 (GND)"
+echo "Hold ~0.8s → shutdown | press while halted → power on"
 echo
-echo "After reboot: short press → shutdown; press while halted → power on"
+echo "  sudo systemctl status babybox-power --no-pager"
+echo "  sudo journalctl -u babybox-power -f"
+echo "  pinctrl get 3   # hi=open, lo=pressed"
