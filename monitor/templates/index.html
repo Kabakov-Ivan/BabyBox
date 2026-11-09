@@ -52,7 +52,7 @@
           <h1>Детская</h1>
           <p class="subheading">Камера и климат</p>
         </div>
-        <span class="demo-label is-demo" id="dataLabel"><i></i>Работает</span>
+        <span class="demo-label is-demo" id="dataLabel"><i></i>Устройство работает</span>
       </div>
 
       <section class="panel camera-panel" id="camera" aria-labelledby="cameraTitle">
@@ -71,7 +71,11 @@
           <div class="camera-overlay"><span id="streamClock">--:--</span></div>
           <div class="camera-controls">
             <button class="round-control" id="talkBtn" type="button" aria-label="Микрофон — скоро" title="Голос родителя — скоро" disabled><svg viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-            <button class="round-control" id="snapshotBtn" type="button" aria-label="Сделать снимок" title="Сделать снимок" disabled><svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+            <button class="round-control" id="snapshotBtn" type="button" aria-label="Сделать снимок" title="Снимок в Записи" disabled><svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+            <button class="round-control record-control" id="cameraRecordBtn" type="button" aria-pressed="false" aria-label="Начать запись видео" title="Запись видео" disabled>
+              <svg class="icon-record" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5.5"/></svg>
+              <svg class="icon-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="7.5" width="9" height="9" rx="1.5"/></svg>
+            </button>
             <button class="round-control" id="cameraFullscreenBtn" type="button" aria-label="Развернуть видео" title="На весь экран">⛶</button>
             <div class="camera-audio">
               <button class="round-control" id="cameraMuteBtn" type="button" aria-pressed="true" aria-label="Включить звук камеры" title="Звук камеры" disabled>
@@ -100,7 +104,7 @@
               <div class="sensor-main">
                 <div class="sensor-value">
                   <strong><span data-reading="temp_c">—</span><em>°C</em></strong>
-                  <small class="sensor-state" data-state="temp_c">Нет данных</small>
+                  <small class="sensor-state" data-state="temp_c">Офлайн</small>
                 </div>
                 <svg class="sparkline temp-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 19 C18 18 19 12 35 14 S55 17 68 10 S87 13 99 5"/></svg>
               </div>
@@ -110,7 +114,7 @@
               <div class="sensor-main">
                 <div class="sensor-value">
                   <strong><span data-reading="humidity_pct">—</span><em>%</em></strong>
-                  <small class="sensor-state" data-state="humidity_pct">Нет данных</small>
+                  <small class="sensor-state" data-state="humidity_pct">Офлайн</small>
                 </div>
                 <svg class="sparkline humidity-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 16 C18 13 24 18 38 12 S58 17 73 11 S89 13 99 8"/></svg>
               </div>
@@ -120,7 +124,7 @@
               <div class="sensor-main">
                 <div class="sensor-value">
                   <strong><span data-reading="co2_ppm">—</span><em>ppm</em></strong>
-                  <small class="sensor-state" data-state="co2_ppm">Нет данных</small>
+                  <small class="sensor-state" data-state="co2_ppm">Офлайн</small>
                 </div>
                 <svg class="sparkline co2-line" viewBox="0 0 100 24" aria-hidden="true"><path d="M1 18 C18 16 20 10 35 13 S53 15 67 8 S82 12 99 6"/></svg>
               </div>
@@ -206,16 +210,19 @@
         <div class="view-heading">
           <div>
             <h1 id="recordingsTitle">Записи</h1>
-            <p class="subheading">Снимки и видеофрагменты</p>
+            <p class="subheading">Галерея снимков и видео с BabyBox</p>
           </div>
-          <button class="button button-secondary" id="recordBtn" type="button" disabled>● Начать запись</button>
+          <div class="view-heading-actions">
+            <button class="button button-secondary" id="refreshMediaBtn" type="button">Обновить</button>
+            <button class="button button-primary" id="recordBtn" type="button" disabled>● Начать запись</button>
+          </div>
         </div>
         <div class="panel recordings-panel-body">
-          <div class="recording-list" id="recordingList">
+          <div class="recording-list" id="recordingList" aria-live="polite">
             <div class="empty-state">
               <span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></span>
               <b>Записей пока нет</b>
-              <small>Подключите видеопоток, чтобы сохранить фрагмент.</small>
+              <small>Сделайте снимок или запись с камеры — файлы появятся здесь.</small>
             </div>
           </div>
         </div>

@@ -30,13 +30,17 @@ if [ ! -x "${APP_DIR}/.venv/bin/python" ]; then
 fi
 
 apt-get update
-apt-get install -y hostapd dnsmasq python3-picamera2 libgpiod2
+apt-get install -y hostapd dnsmasq python3-picamera2 libgpiod2 ffmpeg
 
 # Flask + DHT-11 libraries inside the app venv
 "${APP_DIR}/.venv/bin/pip" install -r "${APP_DIR}/requirements.txt"
 
 # CSI camera / GPIO access for the web service user
 usermod -aG video,gpio "$USER_NAME" 2>/dev/null || true
+
+# Photos / clips gallery folder
+SAVE_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/Save_BabyBox"
+install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR"
 
 install -m 755 "${ROOT}/scripts/babybox-boot-wifi" /usr/local/sbin/babybox-boot-wifi
 install -m 755 "${ROOT}/scripts/babybox-wifi" /usr/local/sbin/babybox-wifi
@@ -110,11 +114,13 @@ echo "  1) Boot → always AP BABY_BOX_SETUP / Sas23766732 + website"
 echo "  2) Phone → http://192.168.4.1:5000/wifi → enter home Wi-Fi"
 echo "  3) Pi joins home Wi-Fi → site on that network IP:5000"
 echo "  4) Camera page auto-loads MJPEG from http://<pi-ip>:5000/stream"
+echo "  5) Photos/videos save to ${SAVE_DIR} and show in Записи"
 echo
 echo "Camera notes:"
 echo "  - venv must see system picamera2: python3 -m venv --system-site-packages ${APP_DIR}/.venv"
 echo "  - user ${USER_NAME} is in groups video,gpio (re-login/reboot after first install)"
 echo "  - quick check: rpicam-hello -t 2000"
+echo "  - video clips need ffmpeg (installed by this script)"
 echo
 # Kernel DHT driver (more reliable than userspace bitbang on Pi)
 if [ -f /boot/firmware/config.txt ]; then

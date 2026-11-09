@@ -8,6 +8,7 @@ from pathlib import Path
 
 from camera_stream import BOUNDARY, camera
 from dht_sensor import dht
+from media_store import media_store
 
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
 
@@ -96,6 +97,70 @@ def video_stream():
             "Access-Control-Allow-Origin": "*",
         },
     )
+
+
+@app.route("/api/media")
+def api_media_list():
+    return jsonify(items=media_store.list_items(), save_dir=str(media_store.root))
+
+
+@app.route("/api/media/file/<path:filename>")
+def api_media_file(filename):
+    path = media_store.resolve(filename)
+    if path is None or not path.is_file():
+        return jsonify(error="Файл не найден"), 404
+    return send_from_directory(media_store.root, path.name)
+
+
+@app.route("/api/media/snapshot", methods=["POST"])
+def api_media_snapshot():
+    frame = camera.capture_jpeg()
+    if not frame:
+        return jsonify(error=camera.error or "Не удалось получить кадр с камеры"), 503
+    item = media_store.save_bytes(frame, kind="photo", ext=".jpg")
+    return jsonify(item=item, message="Снимок сохранён в Записи")
+
+
+@app.route("/api/media/record/start", methods=["POST"])
+def api_media_record_start():
+    path = media_store.prepare_path("video", ".mp4")
+    ok, message = camera.start_clip(path)
+    if not ok:
+        return jsonify(error=message, recording=camera.recording), 409 if camera.recording else 503
+    return jsonify(recording=True, message=message, name=path.name)
+
+
+@app.route("/api/media/record/stop", methods=["POST"])
+def api_media_record_stop():
+    ok, path, message = camera.stop_clip()
+    if not ok or path is None:
+        return jsonify(error=message, recording=False), 400
+    item = media_store.meta_for(path)
+    return jsonify(item=item, recording=False, message=message)
+
+
+@app.route("/api/media/upload", methods=["POST"])
+def api_media_upload():
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify(error="Файл не передан"), 400
+    data = uploaded.read()
+    if not data:
+        return jsonify(error="Пустой файл"), 400
+    kind = (request.form.get("kind") or "clip").strip().lower()
+    if kind not in {"photo", "clip", "video"}:
+        kind = "clip"
+    if kind == "video":
+        kind = "clip"
+    item = media_store.save_upload(data, uploaded.filename, kind=kind)
+    return jsonify(item=item, message="Файл сохранён в Записи")
+
+
+@app.route("/api/media/<path:filename>", methods=["DELETE"])
+def api_media_delete(filename):
+    if not media_store.delete(filename):
+        return jsonify(error="Файл не найден"), 404
+    return jsonify(ok=True, message="Файл удалён")
 
 
 @app.route("/wifi/networks")

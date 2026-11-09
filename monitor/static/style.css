@@ -313,6 +313,7 @@ h1, h2, h3, p { margin-top: 0; }
 .heading-title { min-width: 0; display: flex; align-items: center; gap: 11px; }
 .heading-title h2 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
 .heading-title p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.heading-title p:empty { display: none; }
 .heading-icon { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; }
 .live-indicator { background: #718097; }
 .live-indicator.is-live { background: var(--green); box-shadow: 0 0 0 5px rgb(43 216 154 / 12%); }
@@ -328,6 +329,7 @@ h1, h2, h3, p { margin-top: 0; }
   letter-spacing: .6px;
 }
 .quality-tag.is-live { background: #123d37; color: #70e6b9; }
+.quality-tag.is-recording { background: #4a1822; color: #ff8fa3; }
 .panel-actions .icon-button { width: 34px; height: 34px; border-radius: 10px; font-size: 17px; }
 
 .camera-panel {
@@ -587,6 +589,18 @@ h1, h2, h3, p { margin-top: 0; }
 }
 .round-control:hover:not(:disabled) { background: #263957; transform: translateY(-1px); }
 .round-control:disabled { opacity: .42; cursor: not-allowed; }
+.round-control.record-control .icon-stop { display: none; }
+.round-control.record-control.is-recording {
+  background: #5a1d28;
+  color: #ffb3c0;
+  border-color: #7a3040;
+}
+.round-control.record-control.is-recording .icon-record { display: none; }
+.round-control.record-control.is-recording .icon-stop { display: block; }
+.round-control.record-control .icon-record {
+  fill: #ff5d75;
+  stroke: #ff5d75;
+}
 .camera-stage.light-on .camera-illustration { filter: brightness(1.28) saturate(1.08); }
 .camera-stage.light-on .room-glow {
   background: radial-gradient(ellipse, rgb(240 179 90 / 28%), transparent 70%);
@@ -801,6 +815,19 @@ h1, h2, h3, p { margin-top: 0; }
   line-height: 1.1;
 }
 .view-heading .subheading { margin: 4px 0 0; }
+.view-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.button.is-recording,
+#recordBtn.is-recording {
+  background: #5a1d28;
+  border-color: #7a3040;
+  color: #ffd0d8;
+}
 
 .report-cards {
   display: grid;
@@ -867,8 +894,8 @@ h1, h2, h3, p { margin-top: 0; }
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
   align-content: start;
   overflow: auto;
   padding-right: 2px;
@@ -892,28 +919,42 @@ h1, h2, h3, p { margin-top: 0; }
 .recording-item {
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid #2e353e;
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--panel-soft);
 }
-.recording-thumb {
-  width: 64px;
-  height: 44px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #343b46, #15181c);
-  color: #e0e4ea;
+.recording-preview {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #0d1117;
+  border: 1px solid #2a323c;
 }
-.recording-meta { min-width: 0; flex: 1; }
+.recording-meta { min-width: 0; }
 .recording-meta b, .recording-meta small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.recording-meta b { font-size: 13px; }
+.recording-meta b { font-size: 14px; }
 .recording-meta small { margin-top: 4px; color: var(--muted); font-size: 12px; }
-.recording-item a { color: #c2c8d0; font-size: 13px; font-weight: 600; }
+.recording-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.recording-actions .text-button {
+  color: #c2c8d0;
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.recording-actions .text-button.danger { color: #ff8fa3; }
+.recording-actions .text-button:hover { opacity: .85; }
 
 .settings-shell {
   flex: 1;
@@ -1272,6 +1313,9 @@ body[data-theme="light"] .connect-dialog input,
 body[data-theme="light"] .connect-dialog select { background: #fff; color: var(--text); }
 body[data-theme="light"] .device-card,
 body[data-theme="light"] .recording-item { border-color: var(--border); }
+body[data-theme="light"] .recording-preview { border-color: var(--border); background: #e8ecf1; }
+body[data-theme="light"] .recording-actions .text-button { color: #445066; }
+body[data-theme="light"] .recording-actions .text-button.danger { color: #c43b55; }
 body[data-theme="light"] .sensor-name,
 body[data-theme="light"] .control-tile b,
 body[data-theme="light"] .heading-title h2 { color: #273750; }

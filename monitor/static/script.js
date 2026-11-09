@@ -44,7 +44,7 @@ function setReading(key, value, live = false) {
   if (reportTarget) reportTarget.textContent = display;
   const state = $(`[data-state="${key}"]`);
   if (state) {
-    state.textContent = live ? 'От устройства' : 'Нет данных';
+    state.textContent = live ? 'Онлайн' : 'Офлайн';
     state.classList.toggle('live-state', live);
   }
 }
@@ -116,6 +116,7 @@ function setView(view) {
   navLinks.forEach(link => link.classList.toggle('active', link.dataset.view === view));
   document.body.dataset.view = view;
   history.replaceState(null, '', `#${view === 'home' ? 'dashboard' : view}`);
+  if (view === 'recordings' && typeof loadMediaGallery === 'function') loadMediaGallery();
 }
 
 navLinks.forEach(link => link.addEventListener('click', event => {
@@ -217,6 +218,8 @@ const streamError = $('#streamError');
 const LOCAL_STREAM_URL = '/stream';
 let streamType = 'mjpeg';
 let streamConnected = false;
+let mediaRecording = false;
+let mediaBusy = false;
 
 function setCameraAudioEnabled(enabled) {
   const muteBtn = $('#cameraMuteBtn');
@@ -244,15 +247,33 @@ function setCameraMuted(muted) {
   muteBtn.title = muted ? 'Звук выключен' : 'Звук включён';
 }
 
+function setRecordButtons(recording) {
+  const label = recording ? '■ Остановить' : '● Начать запись';
+  const pressed = String(!!recording);
+  ['#recordBtn', '#cameraRecordBtn'].forEach(selector => {
+    const btn = $(selector);
+    if (!btn) return;
+    if (selector === '#recordBtn') btn.textContent = label;
+    btn.setAttribute('aria-pressed', pressed);
+    btn.classList.toggle('is-recording', !!recording);
+    btn.setAttribute('aria-label', recording ? 'Остановить запись видео' : 'Начать запись видео');
+    btn.title = recording ? 'Остановить запись' : 'Запись видео';
+  });
+}
+
 function setCameraStatus(state, live = false) {
   $('#cameraState').textContent = state;
   $('#cameraDot')?.classList.toggle('is-live', live);
-  $('#qualityTag').textContent = live ? 'MJPEG' : 'ОЖИДАНИЕ';
+  $('#qualityTag').textContent = live ? (mediaRecording ? 'REC' : 'Прямой эфир') : 'ОЖИДАНИЕ';
   $('#qualityTag').classList.toggle('is-live', live);
-  $('#snapshotBtn').disabled = !live;
-  $('#recordBtn').disabled = true;
+  $('#qualityTag').classList.toggle('is-recording', live && mediaRecording);
+  $('#snapshotBtn').disabled = !live || mediaBusy;
+  const canRecord = live || mediaRecording;
+  $('#recordBtn').disabled = !canRecord || mediaBusy;
+  $('#cameraRecordBtn').disabled = !canRecord || mediaBusy;
   setCameraAudioEnabled(false);
   streamConnected = live;
+  setRecordButtons(mediaRecording);
 }
 
 function showCameraPlaceholder() {
@@ -286,7 +307,7 @@ function startLocalStream() {
 mjpegStream.addEventListener('load', () => {
   streamPlaceholder.hidden = true;
   streamError.hidden = true;
-  setCameraStatus('Прямой эфир', true);
+  setCameraStatus('', true);
 });
 mjpegStream.addEventListener('error', () => {
   showCameraPlaceholder();
@@ -333,83 +354,181 @@ $('#cameraVolume')?.addEventListener('input', event => {
   else if (videoStream.muted) setCameraMuted(false);
 });
 
-$('#snapshotBtn').addEventListener('click', () => {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = streamType === 'video' ? videoStream.videoWidth : mjpegStream.naturalWidth;
-    canvas.height = streamType === 'video' ? videoStream.videoHeight : mjpegStream.naturalHeight;
-    if (!canvas.width || !canvas.height) throw new Error('No frame');
-    const context = canvas.getContext('2d');
-    context.drawImage(streamType === 'video' ? videoStream : mjpegStream, 0, 0, canvas.width, canvas.height);
-    const link = document.createElement('a');
-    link.download = `radio-nanny-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    addEvent('Снимок сохранён', 'Файл скачан в браузере', 'cyan');
-  } catch {
-    showToast('Камера не разрешает сохранить снимок. Проверьте поддержку CORS на потоке.');
-  }
-});
+function formatBytes(size) {
+  if (!Number.isFinite(size) || size < 0) return '';
+  if (size < 1024) return `${size} Б`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} КБ`;
+  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
+}
 
-// Запись видео сохраняется локально в браузере, если источник — видео и браузер поддерживает MediaRecorder.
-let recorder = null;
-let recordedChunks = [];
-let recordingStartedAt = 0;
-$('#recordBtn').addEventListener('click', () => {
-  if (recorder?.state === 'recording') {
-    recorder.stop();
-    return;
-  }
-  try {
-    const capture = videoStream.captureStream?.() || videoStream.mozCaptureStream?.();
-    if (!capture) throw new Error('Video capture is unavailable');
-    const preferredType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
-    recorder = new MediaRecorder(capture, preferredType ? { mimeType: preferredType } : undefined);
-    recordedChunks = [];
-    recordingStartedAt = Date.now();
-    recorder.addEventListener('dataavailable', event => { if (event.data.size) recordedChunks.push(event.data); });
-    recorder.addEventListener('stop', saveRecording);
-    recorder.start(1000);
-    $('#recordBtn').textContent = '■ Остановить запись';
-    addEvent('Началась запись видео', 'Файл сохранится на этом устройстве', 'orange');
-  } catch {
-    showToast('Этот видеопоток или браузер не поддерживает запись.');
-  }
-});
+function formatMediaDate(value) {
+  const date = new Date(typeof value === 'number' ? value * 1000 : value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
-function saveRecording() {
-  const blob = new Blob(recordedChunks, { type: recorder.mimeType || 'video/webm' });
-  if (!blob.size) {
-    showToast('Видеопоток не передал данные для записи.');
-    $('#recordBtn').textContent = '● Начать запись';
-    return;
+function emptyMediaState() {
+  const empty = document.createElement('div');
+  empty.className = 'empty-state';
+  empty.innerHTML = `
+    <span aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></svg></span>
+    <b>Записей пока нет</b>
+    <small>Сделайте снимок или запись с камеры — файлы появятся здесь.</small>
+  `;
+  return empty;
+}
+
+function renderMediaItem(item) {
+  const article = document.createElement('article');
+  article.className = `recording-item is-${item.kind}`;
+  article.dataset.name = item.name;
+
+  const preview = document.createElement(item.kind === 'photo' ? 'img' : 'video');
+  preview.className = 'recording-preview';
+  preview.src = item.url;
+  if (item.kind === 'photo') {
+    preview.alt = item.name;
+    preview.loading = 'lazy';
+  } else {
+    preview.controls = true;
+    preview.playsInline = true;
+    preview.preload = 'metadata';
   }
-  const url = URL.createObjectURL(blob);
-  const fileName = `radio-nanny-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-  const item = document.createElement('article');
-  item.className = 'recording-item';
-  const thumb = document.createElement('span');
-  thumb.className = 'recording-thumb';
-  thumb.textContent = '▶';
-  const meta = document.createElement('span');
+
+  const meta = document.createElement('div');
   meta.className = 'recording-meta';
   const title = document.createElement('b');
-  title.textContent = new Date(recordingStartedAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const duration = document.createElement('small');
-  duration.textContent = `${Math.max(1, Math.round((Date.now() - recordingStartedAt) / 1000))} сек · локальный файл`;
-  const download = document.createElement('a');
-  download.href = url;
-  download.download = fileName;
-  download.textContent = 'Скачать';
-  meta.append(title, duration);
-  item.append(thumb, meta, download);
-  const list = $('#recordingList');
-  list.querySelector('.empty-state')?.remove();
-  list.prepend(item);
-  $('#recordBtn').textContent = '● Начать запись';
-  addEvent('Запись сохранена', 'Файл скачивается из раздела «Записи»', 'green');
-  showToast('Запись готова. Скачай её в разделе «Записи».');
+  title.textContent = item.kind === 'photo' ? 'Снимок' : 'Видео';
+  const details = document.createElement('small');
+  details.textContent = [formatMediaDate(item.created_at || item.mtime), formatBytes(item.size)]
+    .filter(Boolean)
+    .join(' · ');
+  meta.append(title, details);
+
+  const actions = document.createElement('div');
+  actions.className = 'recording-actions';
+  const open = document.createElement('a');
+  open.className = 'text-button';
+  open.href = item.url;
+  open.target = '_blank';
+  open.rel = 'noopener';
+  open.textContent = 'Открыть';
+  const remove = document.createElement('button');
+  remove.className = 'text-button danger';
+  remove.type = 'button';
+  remove.textContent = 'Удалить';
+  remove.addEventListener('click', () => deleteMediaItem(item.name));
+  actions.append(open, remove);
+
+  article.append(preview, meta, actions);
+  return article;
 }
+
+function renderMediaGallery(items) {
+  const list = $('#recordingList');
+  if (!list) return;
+  list.replaceChildren();
+  if (!items.length) {
+    list.append(emptyMediaState());
+    return;
+  }
+  items.forEach(item => list.append(renderMediaItem(item)));
+}
+
+async function loadMediaGallery(showFailure = false) {
+  try {
+    const response = await fetch('/api/media', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    renderMediaGallery(payload.items || []);
+    return true;
+  } catch {
+    if (showFailure) showToast('Не удалось загрузить галерею записей.');
+    return false;
+  }
+}
+
+async function deleteMediaItem(name) {
+  if (!name) return;
+  if (!window.confirm('Удалить этот файл из записей?')) return;
+  try {
+    const response = await fetch(`/api/media/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    showToast('Файл удалён');
+    addEvent('Файл удалён', name, '');
+    await loadMediaGallery();
+  } catch (error) {
+    showToast(error.message || 'Не удалось удалить файл');
+  }
+}
+
+async function saveSnapshot() {
+  if (!streamConnected || mediaBusy) return;
+  mediaBusy = true;
+  setCameraStatus($('#cameraState').textContent, streamConnected);
+  try {
+    const response = await fetch('/api/media/snapshot', { method: 'POST' });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    showToast('Снимок сохранён во вкладке «Записи»');
+    addEvent('Снимок сохранён', 'Файл в галерее BabyBox', 'cyan');
+    await loadMediaGallery();
+  } catch (error) {
+    showToast(error.message || 'Не удалось сохранить снимок');
+  } finally {
+    mediaBusy = false;
+    setCameraStatus($('#cameraState').textContent, streamConnected);
+  }
+}
+
+async function toggleMediaRecording() {
+  if (mediaBusy) return;
+  mediaBusy = true;
+  setCameraStatus($('#cameraState').textContent, streamConnected);
+  try {
+    if (mediaRecording) {
+      const response = await fetch('/api/media/record/stop', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      mediaRecording = false;
+      showToast('Видео сохранено во вкладке «Записи»');
+      addEvent('Запись сохранена', 'Видео в галерее BabyBox', 'green');
+      await loadMediaGallery();
+    } else {
+      if (!streamConnected) {
+        showToast('Сначала дождитесь прямого эфира камеры');
+        return;
+      }
+      const response = await fetch('/api/media/record/start', { method: 'POST' });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+      mediaRecording = true;
+      showToast('Идёт запись видео…');
+      addEvent('Началась запись видео', 'Сохранение на BabyBox', 'orange');
+    }
+  } catch (error) {
+    showToast(error.message || 'Ошибка записи видео');
+  } finally {
+    mediaBusy = false;
+    setCameraStatus(mediaRecording ? 'Идёт запись…' : (streamConnected ? '' : 'Источник не подключён'), streamConnected);
+  }
+}
+
+$('#snapshotBtn').addEventListener('click', saveSnapshot);
+$('#recordBtn')?.addEventListener('click', toggleMediaRecording);
+$('#cameraRecordBtn')?.addEventListener('click', toggleMediaRecording);
+$('#refreshMediaBtn')?.addEventListener('click', () => {
+  loadMediaGallery(true).then(ok => {
+    if (ok) showToast('Галерея обновлена');
+  });
+});
+loadMediaGallery();
 
 const DEFAULT_VOLUME = 0.35;
 let audioContext = null;
