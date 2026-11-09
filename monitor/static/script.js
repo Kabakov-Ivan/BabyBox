@@ -176,6 +176,8 @@ const viewScreens = {
   settings: $('#settings')
 };
 
+let reportTimer = null;
+
 function setView(view) {
   homePanels.forEach(panel => { if (panel) panel.hidden = view !== 'home'; });
   Object.entries(viewScreens).forEach(([name, panel]) => {
@@ -186,17 +188,14 @@ function setView(view) {
   history.replaceState(null, '', `#${view === 'home' ? 'dashboard' : view}`);
   if (view === 'recordings' && typeof loadMediaGallery === 'function') loadMediaGallery();
   if (view !== 'recordings' && typeof closeMediaViewer === 'function') closeMediaViewer();
-  if (view === 'reports') startReportPolling();
-  else stopReportPolling();
+  // Reports polling is started later from ensureReportsForView() after helpers exist.
+  if (typeof ensureReportsForView === 'function') ensureReportsForView(view);
 }
 
 navLinks.forEach(link => link.addEventListener('click', event => {
   event.preventDefault();
   setView(link.dataset.view);
 }));
-
-const hashView = location.hash.replace('#', '');
-setView(['reports', 'recordings', 'settings'].includes(hashView) ? hashView : 'home');
 
 function setSettingsPane(name) {
   $$('.settings-menu-item[data-settings]').forEach(item => {
@@ -826,8 +825,6 @@ function applyDayReport(payload) {
   });
 }
 
-let reportTimer = null;
-
 async function loadDayReport() {
   try {
     const response = await fetch(reportEndpoint(), { cache: 'no-store' });
@@ -848,6 +845,14 @@ function stopReportPolling() {
   clearInterval(reportTimer);
   reportTimer = null;
 }
+
+function ensureReportsForView(view) {
+  if (view === 'reports') startReportPolling();
+  else stopReportPolling();
+}
+
+const hashView = location.hash.replace('#', '');
+setView(['reports', 'recordings', 'settings'].includes(hashView) ? hashView : 'home');
 
 async function pollDevice(showFailure = false) {
   const controller = new AbortController();
