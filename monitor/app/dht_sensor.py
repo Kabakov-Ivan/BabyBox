@@ -1,30 +1,32 @@
-"""DHT-11 temperature / humidity reader for Raspberry Pi GPIO."""
+"""DHT-11 bridge: Flask talks to a child worker process (never imports Blinka)."""
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import subprocess
+import sys
 import threading
 import time
+from pathlib import Path
 from typing import Optional
 
 log = logging.getLogger(__name__)
 
-# Physical pin 7 on the 40-pin header == BCM GPIO 4
 DEFAULT_BCM_PIN = 4
-READ_INTERVAL_SEC = 3.0
-MAX_RETRIES = 3
+BOOT_TIMEOUT_SEC = 20.0
+WORKER_SCRIPT = Path(__file__).resolve().parent / "dht_worker.py"
 
 
 class DhtSensor:
-    """Background DHT-11 reader with last-good-value cache."""
+    """Reads DHT-11 via subprocess so the web server cannot freeze on GPIO bitbang."""
 
     def __init__(self, bcm_pin: int = DEFAULT_BCM_PIN) -> None:
         self.bcm_pin = bcm_pin
         self._lock = threading.Lock()
-        self._device = None
-        self._thread: Optional[threading.Thread] = None
-        self._boot_thread: Optional[threading.Thread] = None
-        self._stop = threading.Event()
+        self._proc: Optional[subprocess.Popen] = None
+        self._reader: Optional[threading.Thread] = None
         self._started = False
         self._booting = False
         self._disabled = False
@@ -32,12 +34,14 @@ class DhtSensor:
         self._temperature_c: Optional[float] = None
         self._humidity_pct: Optional[float] = None
         self._updated_at: Optional[float] = None
+        self._boot_started_at: Optional[float] = None
 
     @property
     def available(self) -> bool:
-        return self._started and self._error is None and self._temperature_c is not None
+        return self._temperature_c is not None and self._humidity_pct is not None
 
     def status(self) -> dict:
+        self._expire_boot_if_needed()
         with self._lock:
             payload = {
                 "sensor": "DHT11",
@@ -57,131 +61,125 @@ class DhtSensor:
             return payload
 
     def start(self) -> bool:
-        """Kick off DHT init in a background thread (never blocks the web server)."""
+        """Start the worker if needed. Always returns quickly."""
         with self._lock:
-            if self._disabled or self._started or self._booting:
-                return self._started and not self._disabled
+            if self._disabled:
+                return False
+            if self._proc and self._proc.poll() is None:
+                return True
             self._booting = True
-            self._boot_thread = threading.Thread(
-                target=self._boot,
-                name="dht11-boot",
-                daemon=True,
-            )
-            self._boot_thread.start()
-            return True
-
-    def _boot(self) -> None:
-        try:
-            import adafruit_dht
-            import board
-        except ImportError as exc:
-            with self._lock:
-                self._disabled = True
-                self._booting = False
-                self._error = (
-                    "DHT library missing — "
-                    "pip install adafruit-circuitpython-dht Adafruit-Blinka"
-                )
-            log.warning("%s (%s)", self._error, exc)
-            return
-        except Exception as exc:
-            with self._lock:
-                self._disabled = True
-                self._booting = False
-                self._error = f"DHT import failed: {exc}"
-            log.exception(self._error)
-            return
-
-        pin = getattr(board, f"D{self.bcm_pin}", None)
-        if pin is None:
-            with self._lock:
-                self._disabled = True
-                self._booting = False
-                self._error = f"GPIO BCM {self.bcm_pin} is not available on this board"
-            log.error(self._error)
-            return
-
-        try:
-            # use_pulseio=False is more reliable on recent Raspberry Pi OS.
-            device = adafruit_dht.DHT11(pin, use_pulseio=False)
-        except Exception as exc:
-            with self._lock:
-                self._disabled = True
-                self._booting = False
-                self._error = f"Failed to open DHT-11 on GPIO {self.bcm_pin}: {exc}"
-                self._device = None
-            log.exception(self._error)
-            return
-
-        with self._lock:
-            self._device = device
+            self._boot_started_at = time.time()
             self._error = None
+
+            env = os.environ.copy()
+            env["DHT_BCM_PIN"] = str(self.bcm_pin)
+            env["PYTHONUNBUFFERED"] = "1"
+
+            try:
+                self._proc = subprocess.Popen(
+                    [sys.executable, str(WORKER_SCRIPT)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=env,
+                    cwd=str(WORKER_SCRIPT.parent),
+                )
+            except Exception as exc:
+                self._disabled = True
+                self._booting = False
+                self._error = f"Failed to start DHT worker: {exc}"
+                log.exception(self._error)
+                return False
+
             self._started = True
-            self._booting = False
-            self._stop.clear()
-            self._thread = threading.Thread(
-                target=self._poll_loop,
-                name="dht11-reader",
+            self._reader = threading.Thread(
+                target=self._read_stdout,
+                name="dht11-stdout",
                 daemon=True,
             )
-            self._thread.start()
-        log.info("DHT-11 reader started on BCM GPIO %s", self.bcm_pin)
+            self._reader.start()
+            threading.Thread(
+                target=self._read_stderr,
+                name="dht11-stderr",
+                daemon=True,
+            ).start()
+            log.info("DHT-11 worker started (BCM GPIO %s, pid %s)", self.bcm_pin, self._proc.pid)
+            return True
 
     def stop(self) -> None:
         with self._lock:
-            self._stop_unlocked()
-
-    def _stop_unlocked(self) -> None:
-        self._stop.set()
-        thread = self._thread
-        device = self._device
-        self._thread = None
-        self._device = None
-        self._started = False
-        self._booting = False
-        if thread and thread.is_alive() and thread is not threading.current_thread():
-            # Join outside would be safer; keep short to avoid hanging stop().
-            thread.join(timeout=2.0)
-        if device is not None:
+            proc = self._proc
+            self._proc = None
+            self._started = False
+            self._booting = False
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
             try:
-                device.exit()
-            except Exception:
-                pass
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
-    def _poll_loop(self) -> None:
-        while not self._stop.wait(READ_INTERVAL_SEC):
-            self._read_once()
-
-    def _read_once(self) -> None:
+    def _expire_boot_if_needed(self) -> None:
         with self._lock:
-            device = self._device
-        if device is None:
-            return
-
-        last_error: Optional[str] = None
-        for _ in range(MAX_RETRIES):
-            try:
-                temperature = device.temperature
-                humidity = device.humidity
-                if temperature is None or humidity is None:
-                    last_error = "DHT-11 returned empty values"
-                    time.sleep(0.2)
-                    continue
-                with self._lock:
-                    self._temperature_c = float(temperature)
-                    self._humidity_pct = float(humidity)
-                    self._updated_at = time.time()
-                    self._error = None
+            if not self._booting or self._boot_started_at is None:
                 return
-            except Exception as exc:
-                # DHT checksum / timing failures are common; keep last good reading.
-                last_error = str(exc)
-                time.sleep(0.25)
+            if time.time() - self._boot_started_at < BOOT_TIMEOUT_SEC:
+                return
+            self._booting = False
+            if self._temperature_c is None:
+                self._error = (
+                    "DHT worker timeout — check wiring (DATA→pin 7 / GPIO4) "
+                    "and that the service user can access GPIO"
+                )
+                log.warning(self._error)
 
-        if last_error and self._temperature_c is None:
-            with self._lock:
-                self._error = last_error
-            log.debug("DHT-11 read failed: %s", last_error)
+    def _apply_payload(self, payload: dict) -> None:
+        with self._lock:
+            if "error" in payload and "temp_c" not in payload:
+                # Keep last good values; only record error when we have nothing yet.
+                if self._temperature_c is None:
+                    self._error = str(payload["error"])
+                return
+            if payload.get("ready"):
+                return
+            if "temp_c" in payload and "humidity_pct" in payload:
+                self._temperature_c = float(payload["temp_c"])
+                self._humidity_pct = float(payload["humidity_pct"])
+                self._updated_at = time.time()
+                self._error = None
+                self._booting = False
+
+    def _read_stdout(self) -> None:
+        proc = self._proc
+        if proc is None or proc.stdout is None:
+            return
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                log.debug("DHT worker bad line: %r", line)
+                continue
+            if isinstance(payload, dict):
+                self._apply_payload(payload)
+        with self._lock:
+            code = proc.poll()
+            self._booting = False
+            if self._temperature_c is None:
+                self._error = f"DHT worker exited (code {code})"
+                self._disabled = True
+            self._started = False
+
+    def _read_stderr(self) -> None:
+        proc = self._proc
+        if proc is None or proc.stderr is None:
+            return
+        for line in proc.stderr:
+            text = line.strip()
+            if text:
+                log.warning("DHT worker: %s", text)
 
 
 dht = DhtSensor()

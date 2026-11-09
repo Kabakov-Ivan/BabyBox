@@ -84,8 +84,7 @@ def api_camera():
 @app.route("/api/status")
 def api_status():
     """Live sensor readings for the web panel (temperature / humidity)."""
-    if not dht.available:
-        dht.start()
+    dht.start()
     return jsonify(dht.status())
 
 
