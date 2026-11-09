@@ -654,7 +654,30 @@ function playLullaby() {
 let apiBase = localStorage.getItem('radio-nanny-api-url') || '';
 let apiOnline = false;
 let apiTimer = null;
-if (apiBase) $('#apiUrl').value = apiBase;
+let pollFails = 0;
+
+function normalizeApiBase(value) {
+  const trimmed = (value || '').trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    // Тот же хост, что и страница — всегда ходим относительным /api/status
+    if (parsed.origin === window.location.origin) return '';
+    return trimmed;
+  } catch {
+    return '';
+  }
+}
+
+apiBase = normalizeApiBase(apiBase);
+if (apiBase) {
+  localStorage.setItem('radio-nanny-api-url', apiBase);
+  if ($('#apiUrl')) $('#apiUrl').value = apiBase;
+} else {
+  localStorage.removeItem('radio-nanny-api-url');
+  if ($('#apiUrl')) $('#apiUrl').value = '';
+}
 
 function setDeviceConnection(online) {
   apiOnline = online;
@@ -671,7 +694,11 @@ function applyDevicePayload(payload) {
   };
   Object.entries(aliases).forEach(([key, possibleKeys]) => {
     const foundKey = possibleKeys.find(name => Object.hasOwn(payload, name));
-    if (foundKey) setReading(key, payload[foundKey], true);
+    if (!foundKey) return;
+    const raw = payload[foundKey];
+    if (raw === undefined || raw === null || raw === '') return;
+    if (typeof raw === 'number' && !Number.isFinite(raw)) return;
+    setReading(key, raw, true);
   });
 }
 
@@ -688,11 +715,14 @@ async function pollDevice(showFailure = false) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const payload = await response.json();
     applyDevicePayload(payload);
+    pollFails = 0;
     setDeviceConnection(true);
     return true;
   } catch {
+    pollFails += 1;
     setDeviceConnection(false);
-    restoreEmptyReadings();
+    // Не мигаем «нет данных» на каждом сбое — только после нескольких подряд.
+    if (pollFails >= 3) restoreEmptyReadings();
     if (showFailure) showToast('Не получилось получить /api/status. Проверь адрес, работу программы и доступ браузера к API.');
     return false;
   } finally {
@@ -702,6 +732,7 @@ async function pollDevice(showFailure = false) {
 
 function startPolling(announce = false) {
   clearInterval(apiTimer);
+  pollFails = 0;
   pollDevice(announce).then(connected => {
     if (announce && connected) showToast('Показания устройства подключены.');
   });
@@ -725,9 +756,11 @@ $('#deviceForm').addEventListener('submit', event => {
     showToast('Укажи полный адрес API, например http://192.168.4.1:5000');
     return;
   }
-  apiBase = value;
-  localStorage.setItem('radio-nanny-api-url', apiBase);
+  apiBase = normalizeApiBase(value);
+  if (apiBase) localStorage.setItem('radio-nanny-api-url', apiBase);
+  else localStorage.removeItem('radio-nanny-api-url');
   startPolling(true);
+  showToast(apiBase ? 'Подключено к удалённому API.' : 'Показания с этого устройства.');
 });
 
 async function sendCommand(action, enabled, extra = {}) {
