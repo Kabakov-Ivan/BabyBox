@@ -187,6 +187,7 @@ function setView(view) {
   document.body.dataset.view = view;
   history.replaceState(null, '', `#${view === 'home' ? 'dashboard' : view}`);
   if (view === 'recordings' && typeof loadMediaGallery === 'function') loadMediaGallery();
+  if (view !== 'recordings' && typeof closeMediaViewer === 'function') closeMediaViewer();
 }
 
 navLinks.forEach(link => link.addEventListener('click', event => {
@@ -453,11 +454,74 @@ function emptyMediaState() {
   return empty;
 }
 
+function closeMediaViewer() {
+  const viewer = $('#mediaViewer');
+  const stage = $('#mediaViewerStage');
+  if (!viewer || !stage) return;
+  stage.querySelectorAll('video').forEach(video => {
+    try {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    } catch {}
+  });
+  stage.replaceChildren();
+  viewer.hidden = true;
+  document.body.classList.remove('media-viewer-open');
+}
+
+function openMediaViewer(item) {
+  const viewer = $('#mediaViewer');
+  const stage = $('#mediaViewerStage');
+  if (!viewer || !stage) return;
+
+  closeMediaViewer();
+
+  const title = $('#mediaViewerTitle');
+  const meta = $('#mediaViewerMeta');
+  if (title) title.textContent = item.kind === 'photo' ? 'Снимок' : 'Видео';
+  if (meta) {
+    meta.textContent = [formatMediaDate(item.created_at || item.mtime), formatBytes(item.size), item.name]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  if (item.kind === 'photo') {
+    const image = document.createElement('img');
+    image.className = 'media-viewer-media';
+    image.src = item.url;
+    image.alt = item.name || 'Снимок';
+    stage.append(image);
+  } else {
+    const video = document.createElement('video');
+    video.className = 'media-viewer-media';
+    video.src = item.url;
+    video.controls = true;
+    video.playsInline = true;
+    video.autoplay = true;
+    stage.append(video);
+  }
+
+  viewer.hidden = false;
+  document.body.classList.add('media-viewer-open');
+}
+
+$('#mediaViewerClose')?.addEventListener('click', closeMediaViewer);
+$('#mediaViewerBackdrop')?.addEventListener('click', closeMediaViewer);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !$('#mediaViewer')?.hidden) closeMediaViewer();
+});
+
 function renderMediaItem(item) {
   const article = document.createElement('article');
   article.className = `recording-item is-${item.kind}`;
   article.dataset.name = item.name;
+  article.tabIndex = 0;
+  article.setAttribute('role', 'button');
+  article.setAttribute('aria-label', `${item.kind === 'photo' ? 'Снимок' : 'Видео'}: открыть`);
 
+  const previewWrap = document.createElement('div');
+  previewWrap.className = 'recording-preview-wrap';
   const preview = document.createElement(item.kind === 'photo' ? 'img' : 'video');
   preview.className = 'recording-preview';
   preview.src = item.url;
@@ -465,10 +529,17 @@ function renderMediaItem(item) {
     preview.alt = item.name;
     preview.loading = 'lazy';
   } else {
-    preview.controls = true;
+    preview.muted = true;
     preview.playsInline = true;
     preview.preload = 'metadata';
+    preview.removeAttribute('controls');
   }
+  const playMark = document.createElement('span');
+  playMark.className = 'recording-play-mark';
+  playMark.hidden = item.kind === 'photo';
+  playMark.setAttribute('aria-hidden', 'true');
+  playMark.textContent = '▶';
+  previewWrap.append(preview, playMark);
 
   const meta = document.createElement('div');
   meta.className = 'recording-meta';
@@ -482,20 +553,26 @@ function renderMediaItem(item) {
 
   const actions = document.createElement('div');
   actions.className = 'recording-actions';
-  const open = document.createElement('a');
-  open.className = 'text-button';
-  open.href = item.url;
-  open.target = '_blank';
-  open.rel = 'noopener';
-  open.textContent = 'Открыть';
   const remove = document.createElement('button');
   remove.className = 'text-button danger';
   remove.type = 'button';
   remove.textContent = 'Удалить';
-  remove.addEventListener('click', () => deleteMediaItem(item.name));
-  actions.append(open, remove);
+  remove.addEventListener('click', event => {
+    event.stopPropagation();
+    deleteMediaItem(item.name);
+  });
+  actions.append(remove);
 
-  article.append(preview, meta, actions);
+  const open = () => openMediaViewer(item);
+  article.addEventListener('click', open);
+  article.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      open();
+    }
+  });
+
+  article.append(previewWrap, meta, actions);
   return article;
 }
 
@@ -530,6 +607,7 @@ async function deleteMediaItem(name) {
     const response = await fetch(`/api/media/${encodeURIComponent(name)}`, { method: 'DELETE' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    if (!$('#mediaViewer')?.hidden) closeMediaViewer();
     showToast('Файл удалён');
     addEvent('Файл удалён', name, '');
     await loadMediaGallery();

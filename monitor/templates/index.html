@@ -314,6 +314,20 @@
   </div>
   </div>
 
+  <div class="media-viewer" id="mediaViewer" hidden>
+    <div class="media-viewer-backdrop" id="mediaViewerBackdrop"></div>
+    <div class="media-viewer-dialog" role="dialog" aria-modal="true" aria-labelledby="mediaViewerTitle">
+      <div class="media-viewer-top">
+        <div class="media-viewer-heading">
+          <b id="mediaViewerTitle">Просмотр</b>
+          <small id="mediaViewerMeta"></small>
+        </div>
+        <button class="media-viewer-close" id="mediaViewerClose" type="button" aria-label="Закрыть">×</button>
+      </div>
+      <div class="media-viewer-stage" id="mediaViewerStage"></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="../static/script.js"></script>
 </body>
