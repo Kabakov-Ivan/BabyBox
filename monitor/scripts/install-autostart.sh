@@ -41,6 +41,7 @@ usermod -aG video,gpio "$USER_NAME" 2>/dev/null || true
 # Photos / clips gallery folder
 SAVE_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/Save_BabyBox"
 install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR"
+install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR/sensors"
 
 install -m 755 "${ROOT}/scripts/babybox-boot-wifi" /usr/local/sbin/babybox-boot-wifi
 install -m 755 "${ROOT}/scripts/babybox-wifi" /usr/local/sbin/babybox-wifi
@@ -155,6 +156,7 @@ echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
 echo "  - kernel overlay: dtoverlay=dht11,gpiopin=4"
 echo "  - separate service: sudo systemctl status babybox-dht"
 echo "  - check file: cat /tmp/babybox-dht.json"
+echo "  - sensor history: ${SAVE_DIR}/sensors/"
 echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
 echo
 echo "Power button notes:"

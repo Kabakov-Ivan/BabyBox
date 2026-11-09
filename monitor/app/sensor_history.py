@@ -1,6 +1,6 @@
 """Daily sensor history for the Reports tab.
 
-Stores throttled samples under monitor/data/sensors/YYYY-MM-DD.jsonl
+Stores throttled samples under /home/admin/Save_BabyBox/sensors/YYYY-MM-DD.jsonl
 """
 
 from __future__ import annotations
@@ -14,10 +14,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 DATA_DIR = Path(
-    os.environ.get(
-        "BABYBOX_SENSOR_DIR",
-        str(Path(__file__).resolve().parent.parent / "data" / "sensors"),
-    )
+    os.environ.get("BABYBOX_SENSOR_DIR", "/home/admin/Save_BabyBox/sensors")
 )
 SAMPLE_EVERY_SEC = float(os.environ.get("BABYBOX_SENSOR_SAMPLE_SEC", "60"))
 KEEP_DAYS = int(os.environ.get("BABYBOX_SENSOR_KEEP_DAYS", "14"))
