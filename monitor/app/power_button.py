@@ -41,11 +41,18 @@ def read_level(pin: int) -> int | None:
         log.warning("pinctrl get failed: %s", exc)
         return None
 
+    # Formats seen across Pi OS builds:
+    #   "3: ip ... | hi // GPIO3 = input"
+    #   "... level=1 ..."
     match = re.search(r"level=(\d)", out)
-    if not match:
-        log.warning("unexpected pinctrl output: %r", out.strip())
-        return None
-    return int(match.group(1))
+    if match:
+        return int(match.group(1))
+    if re.search(r"\|\s*hi\b", out, re.IGNORECASE):
+        return 1
+    if re.search(r"\|\s*lo\b", out, re.IGNORECASE):
+        return 0
+    log.warning("unexpected pinctrl output: %r", out.strip())
+    return None
 
 
 def shutdown() -> None:

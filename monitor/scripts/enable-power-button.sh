@@ -49,4 +49,4 @@ echo "  sudo journalctl -u babybox-power -f"
 echo
 echo "Quick pin check:"
 echo "  pinctrl get 3"
-echo "  # open = level=1, pressed to GND = level=0"
+echo "  # open = hi, pressed to GND = lo"
