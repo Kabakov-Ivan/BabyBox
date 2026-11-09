@@ -24,7 +24,7 @@ class DhtSensor:
     def status(self) -> dict:
         payload = {
             "sensor": "DHT11",
-            "gpio_bcm": 17,
+            "gpio_bcm": 4,
             "available": False,
             "started": False,
             "booting": False,

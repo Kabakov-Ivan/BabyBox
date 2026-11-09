@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("dht_worker")
 
-BCM_PIN = int(os.environ.get("DHT_BCM_PIN", "17"))
+BCM_PIN = int(os.environ.get("DHT_BCM_PIN", "4"))
 DHT_MODEL = os.environ.get("DHT_MODEL", "11").strip()
 BACKEND = os.environ.get("DHT_BACKEND", "auto").strip().lower()
 INTERVAL_SEC = float(os.environ.get("DHT_INTERVAL_SEC", "3"))

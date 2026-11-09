@@ -130,14 +130,18 @@ elif [ -f /boot/config.txt ]; then
 else
   BOOTCFG=""
 fi
-if [ -n "$BOOTCFG" ] && ! grep -q 'dtoverlay=dht11' "$BOOTCFG"; then
-  echo 'dtoverlay=dht11,gpiopin=17' >> "$BOOTCFG"
-  echo "Added dtoverlay=dht11,gpiopin=17 to $BOOTCFG (reboot required once)"
+if [ -n "$BOOTCFG" ]; then
+  if grep -q 'dtoverlay=dht11' "$BOOTCFG"; then
+    sed -i 's/^dtoverlay=dht11.*/dtoverlay=dht11,gpiopin=4/' "$BOOTCFG"
+  else
+    echo 'dtoverlay=dht11,gpiopin=4' >> "$BOOTCFG"
+  fi
+  echo "DHT overlay set to dtoverlay=dht11,gpiopin=4 in $BOOTCFG (reboot if pin changed)"
 fi
 
 echo "DHT-11 notes:"
-echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 11 (BCM GPIO 17)"
-echo "  - kernel overlay: dtoverlay=dht11,gpiopin=17"
+echo "  - VCC→3.3V (pin 1), GND→pin 6, DATA→pin 7 (BCM GPIO 4)"
+echo "  - kernel overlay: dtoverlay=dht11,gpiopin=4"
 echo "  - separate service: sudo systemctl status babybox-dht"
 echo "  - check file: cat /tmp/babybox-dht.json"
 echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
