@@ -9,6 +9,7 @@ from pathlib import Path
 from camera_stream import BOUNDARY, camera
 from dht_sensor import dht
 from media_store import media_store
+from sensor_history import day_report
 
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
 
@@ -83,6 +84,12 @@ def api_camera():
 def api_status():
     """Live sensor readings for the web panel (temperature / humidity)."""
     return jsonify(dht.status())
+
+
+@app.route("/api/reports/today")
+def api_reports_today():
+    """Daily climate report: series + min/max/current for the Reports tab."""
+    return jsonify(day_report())
 
 
 @app.route("/stream")

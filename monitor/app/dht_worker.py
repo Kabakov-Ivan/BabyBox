@@ -28,6 +28,12 @@ INTERVAL_SEC = float(os.environ.get("DHT_INTERVAL_SEC", "3"))
 OUT_PATH = Path(os.environ.get("DHT_STATUS_FILE", "/tmp/babybox-dht.json"))
 IIO_ROOT = Path("/sys/bus/iio/devices")
 
+try:
+    from sensor_history import append_sample
+except ImportError:
+    def append_sample(temp_c, humidity_pct, *, force=False):  # type: ignore
+        return False
+
 
 def write_status(payload: dict, *, keep_last_reading: bool = False) -> None:
     current = {}
@@ -128,6 +134,7 @@ def loop_iio() -> int:
                     "error": None,
                 }
             )
+            append_sample(temperature, humidity)
             log.info("ok temp=%sC humidity=%s%%", temperature, humidity)
         except Exception as exc:
             fails += 1
@@ -197,6 +204,7 @@ def loop_adafruit() -> int:
                     "error": None,
                 }
             )
+            append_sample(float(temperature), float(humidity))
             log.info("ok temp=%sC humidity=%s%%", temperature, humidity)
         except Exception as exc:
             fails += 1

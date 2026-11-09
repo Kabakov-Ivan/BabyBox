@@ -49,3 +49,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local sensor history / media cache
+monitor/data/

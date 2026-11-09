@@ -43,18 +43,16 @@ const sparkHistory = {
   co2_ppm: []
 };
 
-function sparkPathFromValues(values) {
+function linePathFromValues(values, width = 100, height = 24, minSpan = 0.4) {
   if (!values.length) return '';
-  const width = 100;
-  const height = 24;
-  const padY = 3;
+  const padY = Math.max(3, height * 0.08);
   let min = Math.min(...values);
   let max = Math.max(...values);
   // Чуть растягиваем шкалу, чтобы мелкие изменения были видны
-  if (max - min < 0.4) {
+  if (max - min < minSpan) {
     const mid = (min + max) / 2;
-    min = mid - 0.2;
-    max = mid + 0.2;
+    min = mid - minSpan / 2;
+    max = mid + minSpan / 2;
   }
   const range = max - min || 1;
   const stepX = values.length === 1 ? 0 : width / (values.length - 1);
@@ -80,7 +78,7 @@ function sparkPathFromValues(values) {
 function drawSpark(key) {
   const path = $(`[data-spark="${key}"]`);
   if (!path) return;
-  path.setAttribute('d', sparkPathFromValues(sparkHistory[key] || []));
+  path.setAttribute('d', linePathFromValues(sparkHistory[key] || [], 100, 24, 0.4));
 }
 
 function pushSparkSample(key, value) {
@@ -188,6 +186,8 @@ function setView(view) {
   history.replaceState(null, '', `#${view === 'home' ? 'dashboard' : view}`);
   if (view === 'recordings' && typeof loadMediaGallery === 'function') loadMediaGallery();
   if (view !== 'recordings' && typeof closeMediaViewer === 'function') closeMediaViewer();
+  if (view === 'reports') startReportPolling();
+  else stopReportPolling();
 }
 
 navLinks.forEach(link => link.addEventListener('click', event => {
@@ -217,11 +217,6 @@ $$('.settings-menu-item[data-settings]').forEach(item => {
     if (!name || name === 'pin') return;
     setSettingsPane(name === 'autonight' ? 'autonight' : name);
   });
-});
-
-$('#openEventsFromReports')?.addEventListener('click', () => {
-  setView('settings');
-  setSettingsPane('events');
 });
 
 $('#clearEventsBtn')?.addEventListener('click', clearEvents);
@@ -783,6 +778,75 @@ function applyDevicePayload(payload) {
 function statusEndpoint() {
   // Пустой apiBase = тот же хост, с которого открыт сайт (Raspberry Pi).
   return apiBase ? `${apiBase}/api/status` : '/api/status';
+}
+
+function reportEndpoint() {
+  return apiBase ? `${apiBase}/api/reports/today` : '/api/reports/today';
+}
+
+function formatReportValue(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
+
+function drawReportChart(key, series) {
+  const path = $(`[data-report-chart="${key}"]`);
+  if (!path) return;
+  const values = (series || [])
+    .map(point => Number(point?.v))
+    .filter(value => Number.isFinite(value));
+  path.setAttribute('d', linePathFromValues(values, 640, 120, key === 'humidity_pct' ? 2 : 0.6));
+}
+
+function applyDayReport(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  const label = $('#reportDateLabel');
+  if (label && payload.date) {
+    try {
+      const date = new Date(`${payload.date}T12:00:00`);
+      label.textContent = date.toLocaleDateString('ru-RU', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch {
+      label.textContent = payload.date;
+    }
+  }
+
+  ['temp_c', 'humidity_pct'].forEach(key => {
+    const block = payload[key] || {};
+    const current = $(`[data-report="${key}"]`);
+    const min = $(`[data-report-min="${key}"]`);
+    const max = $(`[data-report-max="${key}"]`);
+    if (current) current.textContent = formatReportValue(block.current);
+    if (min) min.textContent = formatReportValue(block.min);
+    if (max) max.textContent = formatReportValue(block.max);
+    drawReportChart(key, block.series || []);
+  });
+}
+
+let reportTimer = null;
+
+async function loadDayReport() {
+  try {
+    const response = await fetch(reportEndpoint(), { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    applyDayReport(await response.json());
+  } catch {
+    // keep previous report values
+  }
+}
+
+function startReportPolling() {
+  clearInterval(reportTimer);
+  loadDayReport();
+  reportTimer = setInterval(loadDayReport, 30000);
+}
+
+function stopReportPolling() {
+  clearInterval(reportTimer);
+  reportTimer = null;
 }
 
 async function pollDevice(showFailure = false) {

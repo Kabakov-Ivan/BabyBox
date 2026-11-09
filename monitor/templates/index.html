@@ -168,41 +168,67 @@
         <div class="view-heading">
           <div>
             <h1 id="reportsTitle">Отчёты</h1>
-            <p class="subheading">Климат и активность за сутки</p>
+            <p class="subheading">Климат за сутки · <span id="reportDateLabel">сегодня</span></p>
           </div>
         </div>
-        <div class="report-cards">
-          <article class="report-card">
-            <span class="report-card-icon temp-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0Z"/><path d="M12 8v9"/></svg></span>
-            <span>Температура</span>
-            <strong><span data-report="temp_c">—</span><em>°C</em></strong>
-            <small>Текущее значение</small>
+        <div class="report-rows">
+          <article class="report-row panel" data-report-metric="temp_c">
+            <div class="report-row-top">
+              <div class="report-row-title">
+                <span class="report-card-icon temp-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M15 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0Z"/><path d="M12 8v9"/></svg></span>
+                <div>
+                  <h2>Температура</h2>
+                  <p>За сегодня</p>
+                </div>
+              </div>
+              <div class="report-stats">
+                <div class="report-stat">
+                  <small>Сейчас</small>
+                  <strong><span data-report="temp_c">—</span><em>°C</em></strong>
+                </div>
+                <div class="report-stat">
+                  <small>Минимум</small>
+                  <strong><span data-report-min="temp_c">—</span><em>°C</em></strong>
+                </div>
+                <div class="report-stat">
+                  <small>Максимум</small>
+                  <strong><span data-report-max="temp_c">—</span><em>°C</em></strong>
+                </div>
+              </div>
+            </div>
+            <svg class="report-chart temp-line" viewBox="0 0 640 120" preserveAspectRatio="none" aria-hidden="true">
+              <path data-report-chart="temp_c" d=""></path>
+            </svg>
           </article>
-          <article class="report-card">
-            <span class="report-card-icon humidity-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3C9.3 7 6 10.2 6 14a6 6 0 0 0 12 0c0-3.8-3.3-7-6-11Z"/><path d="M9 15a3 3 0 0 0 3 3"/></svg></span>
-            <span>Влажность</span>
-            <strong><span data-report="humidity_pct">—</span><em>%</em></strong>
-            <small>Текущее значение</small>
+
+          <article class="report-row panel" data-report-metric="humidity_pct">
+            <div class="report-row-top">
+              <div class="report-row-title">
+                <span class="report-card-icon humidity-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3C9.3 7 6 10.2 6 14a6 6 0 0 0 12 0c0-3.8-3.3-7-6-11Z"/><path d="M9 15a3 3 0 0 0 3 3"/></svg></span>
+                <div>
+                  <h2>Влажность</h2>
+                  <p>За сегодня</p>
+                </div>
+              </div>
+              <div class="report-stats">
+                <div class="report-stat">
+                  <small>Сейчас</small>
+                  <strong><span data-report="humidity_pct">—</span><em>%</em></strong>
+                </div>
+                <div class="report-stat">
+                  <small>Минимум</small>
+                  <strong><span data-report-min="humidity_pct">—</span><em>%</em></strong>
+                </div>
+                <div class="report-stat">
+                  <small>Максимум</small>
+                  <strong><span data-report-max="humidity_pct">—</span><em>%</em></strong>
+                </div>
+              </div>
+            </div>
+            <svg class="report-chart humidity-line" viewBox="0 0 640 120" preserveAspectRatio="none" aria-hidden="true">
+              <path data-report-chart="humidity_pct" d=""></path>
+            </svg>
           </article>
-          <article class="report-card">
-            <span class="report-card-icon co2-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="12" r="4"/><circle cx="16" cy="8" r="2.5"/><circle cx="16" cy="16" r="2.5"/><path d="m11.5 10 2-1m-2 5 2 1"/></svg></span>
-            <span>CO₂</span>
-            <strong><span data-report="co2_ppm">—</span><em>ppm</em></strong>
-            <small>Текущее значение</small>
-          </article>
-          <article class="report-card">
-            <span class="report-card-icon events-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7V3m8 4V3M4 10h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/></svg></span>
-            <span>События</span>
-            <strong id="dailyEventCount">0</strong>
-            <small>За последние 24 часа</small>
-          </article>
-        </div>
-        <div class="report-note panel">
-          <div>
-            <h2>Сводка дня</h2>
-            <p>Показания обновляются с устройства. Полную ленту действий смотрите в настройках.</p>
-          </div>
-          <button class="button button-secondary" id="openEventsFromReports" type="button">Открыть ленту событий</button>
         </div>
       </section>
 

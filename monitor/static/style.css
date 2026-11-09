@@ -832,23 +832,46 @@ h1, h2, h3, p { margin-top: 0; }
   color: #ffd0d8;
 }
 
-.report-cards {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  flex: 0 0 auto;
-}
-.report-card {
-  min-height: 168px;
+.report-rows {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 18px 18px 16px;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.report-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 16px;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   box-shadow: var(--shadow);
+}
+.report-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.report-row-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+}
+.report-row-title h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+.report-row-title p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 .report-card-icon {
   width: 36px;
@@ -856,34 +879,58 @@ h1, h2, h3, p { margin-top: 0; }
   display: inline-grid;
   place-items: center;
   border-radius: 10px;
+  flex: 0 0 auto;
 }
 .events-icon { background: #2a355f; color: #b0bcff; }
-.report-card > span:not(.report-card-icon) { color: #c2cede; font-size: 14px; font-weight: 600; }
-.report-card strong {
-  font-size: 34px;
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(90px, 1fr));
+  gap: 10px 18px;
+  flex: 1;
+  min-width: min(100%, 420px);
+}
+.report-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+.report-stat small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.report-stat strong {
+  font-size: 28px;
   font-weight: 800;
-  letter-spacing: -.8px;
+  letter-spacing: -.7px;
   line-height: 1;
 }
-.report-card strong em {
-  margin-left: 5px;
+.report-stat strong em {
+  margin-left: 4px;
   color: #9aa9bf;
-  font-size: 15px;
+  font-size: 14px;
   font-style: normal;
   font-weight: 550;
 }
-.report-card small { color: var(--muted); font-size: 12px; }
-.report-note {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 22px 24px;
+.report-chart {
+  width: 100%;
+  height: 110px;
+  display: block;
 }
-.report-note h2 { margin: 0 0 6px; font-size: 18px; }
-.report-note p { margin: 0; color: var(--muted); font-size: 14px; max-width: 520px; }
+.report-chart path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.report-chart.humidity-line path { stroke: #58a5ff; }
 
 .recordings-panel-body {
   flex: 1;
@@ -1426,7 +1473,8 @@ body[data-theme="light"] .sensor-card,
 body[data-theme="light"] .control-tile,
 body[data-theme="light"] .setting-block,
 body[data-theme="light"] .settings-menu,
-body[data-theme="light"] .report-card { border-color: var(--border); }
+body[data-theme="light"] .report-row { border-color: var(--border); }
+body[data-theme="light"] .report-stat { background: color-mix(in srgb, #fff 70%, transparent); }
 body[data-theme="light"] .settings-menu-item.active,
 body[data-theme="light"] .settings-toggle-row.active { background: var(--panel-hover); }
 body[data-theme="light"] .setting-block input,
@@ -1650,7 +1698,7 @@ body[data-theme="light"][data-palette="graphite"] .button-primary { color: #fff;
   .sensor-grid { grid-template-rows: none; }
   .control-grid { grid-template-columns: 1fr; }
   .view-screen { overflow: auto; }
-  .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .settings-shell { grid-template-columns: 1fr; overflow: visible; }
   .settings-grid { grid-template-columns: 1fr; }
   .recording-list { grid-template-columns: 1fr; }
@@ -1662,5 +1710,8 @@ body[data-theme="light"][data-palette="graphite"] .button-primary { color: #fff;
   .datetime { display: none; }
   .page-heading h1, .view-heading h1 { font-size: 24px; }
   .sensor-card strong { font-size: 30px; }
-  .report-cards { grid-template-columns: 1fr; }
+  .report-row-top { align-items: flex-start; }
+  .report-stats { width: 100%; min-width: 0; }
+  .report-stat strong { font-size: 24px; }
+  .report-chart { height: 88px; }
 }
