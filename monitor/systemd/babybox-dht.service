@@ -10,7 +10,8 @@ Group=admin
 SupplementaryGroups=gpio
 WorkingDirectory=/home/admin/BabyBox/monitor/app
 Environment=PYTHONUNBUFFERED=1
-Environment=DHT_BCM_PIN=4
+Environment=DHT_BCM_PIN=17
+Environment=DHT_BACKEND=auto
 Environment=DHT_STATUS_FILE=/tmp/babybox-dht.json
 ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/dht_worker.py
 Restart=always

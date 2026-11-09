@@ -1,6 +1,9 @@
-"""Standalone DHT-11 reader. Writes /tmp/babybox-dht.json for the web app.
+"""Standalone DHT reader for BabyBox.
 
-Run separately from Flask (systemd babybox-dht.service) so Blinka cannot freeze the site.
+Backends (env DHT_BACKEND):
+  auto  — prefer Linux IIO (dtoverlay=dht11), else Adafruit
+  iio   — only /sys/bus/iio/...
+  adafruit — only Blinka/adafruit_dht
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ import logging
 import os
 import time
 from pathlib import Path
+from typing import Optional, Tuple
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,11 +21,12 @@ logging.basicConfig(
 )
 log = logging.getLogger("dht_worker")
 
-BCM_PIN = int(os.environ.get("DHT_BCM_PIN", "4"))
-# 11 = DHT11, 22 = DHT22/AM2302 (некоторые модули подписаны неверно)
+BCM_PIN = int(os.environ.get("DHT_BCM_PIN", "17"))
 DHT_MODEL = os.environ.get("DHT_MODEL", "11").strip()
+BACKEND = os.environ.get("DHT_BACKEND", "auto").strip().lower()
 INTERVAL_SEC = float(os.environ.get("DHT_INTERVAL_SEC", "3"))
 OUT_PATH = Path(os.environ.get("DHT_STATUS_FILE", "/tmp/babybox-dht.json"))
+IIO_ROOT = Path("/sys/bus/iio/devices")
 
 
 def write_status(payload: dict, *, keep_last_reading: bool = False) -> None:
@@ -34,11 +39,10 @@ def write_status(payload: dict, *, keep_last_reading: bool = False) -> None:
 
     data = dict(current) if keep_last_reading else {}
     data.update(payload)
-    data["sensor"] = "DHT11"
+    data["sensor"] = f"DHT{DHT_MODEL}"
     data["gpio_bcm"] = BCM_PIN
     data["updated_at"] = time.time()
 
-    # If this update is only an error and we already have numbers, keep available=True.
     if (
         keep_last_reading
         and payload.get("error")
@@ -56,10 +60,84 @@ def write_status(payload: dict, *, keep_last_reading: bool = False) -> None:
     tmp.replace(OUT_PATH)
 
 
-def main() -> int:
-    log.info("starting on BCM GPIO %s → %s", BCM_PIN, OUT_PATH)
-    write_status({"available": False, "booting": True, "started": False, "error": None})
+def find_iio_device() -> Optional[Path]:
+    if not IIO_ROOT.exists():
+        return None
+    for device in sorted(IIO_ROOT.glob("iio:device*")):
+        temp = device / "in_temp_input"
+        hum = device / "in_humidityrelative_input"
+        if temp.exists() and hum.exists():
+            return device
+    return None
 
+
+def read_iio(device: Path) -> Tuple[float, float]:
+    # IIO reports milli-degrees C and milli-% RH.
+    temp_c = int((device / "in_temp_input").read_text().strip()) / 1000.0
+    humidity = int((device / "in_humidityrelative_input").read_text().strip()) / 1000.0
+    return temp_c, humidity
+
+
+def loop_iio() -> int:
+    device = find_iio_device()
+    if device is None:
+        write_status(
+            {
+                "available": False,
+                "booting": False,
+                "started": False,
+                "backend": "iio",
+                "error": (
+                    "IIO DHT not found. Add to /boot/firmware/config.txt: "
+                    f"dtoverlay=dht11,gpiopin={BCM_PIN}  then reboot"
+                ),
+            }
+        )
+        log.error("IIO DHT device not found")
+        return 1
+
+    log.info("using IIO backend at %s", device)
+    write_status(
+        {
+            "available": False,
+            "booting": True,
+            "started": True,
+            "backend": "iio",
+            "error": None,
+        }
+    )
+
+    fails = 0
+    while True:
+        try:
+            temperature, humidity = read_iio(device)
+            fails = 0
+            write_status(
+                {
+                    "available": True,
+                    "started": True,
+                    "booting": False,
+                    "backend": "iio",
+                    "temp_c": round(temperature, 1),
+                    "humidity_pct": round(humidity, 1),
+                    "temperature": round(temperature, 1),
+                    "humidity": round(humidity, 1),
+                    "error": None,
+                }
+            )
+            log.info("ok temp=%sC humidity=%s%%", temperature, humidity)
+        except Exception as exc:
+            fails += 1
+            log.warning("IIO read failed (%s): %s", fails, exc)
+            write_status(
+                {"started": True, "booting": False, "backend": "iio", "error": str(exc)},
+                keep_last_reading=True,
+            )
+            time.sleep(2)
+        time.sleep(INTERVAL_SEC)
+
+
+def loop_adafruit() -> int:
     try:
         import adafruit_dht
         import board
@@ -76,7 +154,6 @@ def main() -> int:
         return 1
 
     try:
-        # use_pulseio=False works more often on Raspberry Pi OS / Bookworm.
         sensor_cls = adafruit_dht.DHT22 if DHT_MODEL == "22" else adafruit_dht.DHT11
         device = sensor_cls(pin, use_pulseio=False)
     except Exception as exc:
@@ -84,11 +161,17 @@ def main() -> int:
         write_status({"available": False, "booting": False, "error": f"open failed: {exc}"})
         return 1
 
-    # First read right after open is often empty — give the bus a moment.
     time.sleep(2)
-
-    write_status({"available": False, "booting": True, "started": True, "error": None})
-    log.info("device opened (DHT%s) on BCM %s, reading every %ss", DHT_MODEL, BCM_PIN, INTERVAL_SEC)
+    write_status(
+        {
+            "available": False,
+            "booting": True,
+            "started": True,
+            "backend": "adafruit",
+            "error": None,
+        }
+    )
+    log.info("using Adafruit DHT%s on BCM %s", DHT_MODEL, BCM_PIN)
 
     fails = 0
     while True:
@@ -103,6 +186,7 @@ def main() -> int:
                     "available": True,
                     "started": True,
                     "booting": False,
+                    "backend": "adafruit",
                     "temp_c": round(float(temperature), 1),
                     "humidity_pct": round(float(humidity), 1),
                     "temperature": round(float(temperature), 1),
@@ -118,13 +202,35 @@ def main() -> int:
                 {
                     "started": True,
                     "booting": False,
+                    "backend": "adafruit",
                     "error": str(exc),
                 },
                 keep_last_reading=True,
             )
-            # DHT often needs a short recovery pause after checksum errors.
             time.sleep(2)
         time.sleep(INTERVAL_SEC)
+
+
+def main() -> int:
+    log.info(
+        "starting backend=%s model=%s gpio=%s → %s",
+        BACKEND,
+        DHT_MODEL,
+        BCM_PIN,
+        OUT_PATH,
+    )
+    write_status({"available": False, "booting": True, "started": False, "error": None})
+
+    if BACKEND == "iio":
+        return loop_iio()
+    if BACKEND == "adafruit":
+        return loop_adafruit()
+
+    # auto
+    if find_iio_device() is not None:
+        return loop_iio()
+    log.warning("IIO not present, falling back to Adafruit bitbang")
+    return loop_adafruit()
 
 
 if __name__ == "__main__":
