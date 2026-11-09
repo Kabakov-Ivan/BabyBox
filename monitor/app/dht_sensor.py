@@ -25,6 +25,7 @@ class DhtSensor:
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()
         self._started = False
+        self._disabled = False
         self._error: Optional[str] = None
         self._temperature_c: Optional[float] = None
         self._humidity_pct: Optional[float] = None
@@ -54,6 +55,8 @@ class DhtSensor:
 
     def start(self) -> bool:
         with self._lock:
+            if self._disabled:
+                return False
             if self._started and self._error is None:
                 return True
             if self._started:
@@ -63,16 +66,18 @@ class DhtSensor:
                 import adafruit_dht
                 import board
             except ImportError as exc:
+                self._disabled = True
                 self._error = (
-                    "Библиотека DHT не установлена "
-                    "(pip install adafruit-circuitpython-dht)."
+                    "DHT library missing — "
+                    "pip install adafruit-circuitpython-dht Adafruit-Blinka"
                 )
                 log.warning("%s (%s)", self._error, exc)
                 return False
 
             pin = getattr(board, f"D{self.bcm_pin}", None)
             if pin is None:
-                self._error = f"GPIO BCM {self.bcm_pin} недоступен на этой плате."
+                self._disabled = True
+                self._error = f"GPIO BCM {self.bcm_pin} is not available on this board"
                 log.error(self._error)
                 return False
 
@@ -80,7 +85,8 @@ class DhtSensor:
                 # use_pulseio=False is more reliable on recent Raspberry Pi OS.
                 self._device = adafruit_dht.DHT11(pin, use_pulseio=False)
             except Exception as exc:
-                self._error = f"Не удалось открыть DHT-11 на GPIO {self.bcm_pin}: {exc}"
+                self._disabled = True
+                self._error = f"Failed to open DHT-11 on GPIO {self.bcm_pin}: {exc}"
                 log.exception(self._error)
                 self._device = None
                 return False
