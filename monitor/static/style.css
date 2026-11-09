@@ -998,7 +998,7 @@ h1, h2, h3, p { margin-top: 0; }
 .media-viewer-backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(2 6 12 / 78%);
+  background: color-mix(in srgb, var(--page) 82%, transparent);
   backdrop-filter: blur(6px);
 }
 .media-viewer-dialog {
@@ -1010,10 +1010,10 @@ h1, h2, h3, p { margin-top: 0; }
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 18px;
-  background: #121821;
-  box-shadow: 0 28px 80px rgb(0 0 0 / 55%);
+  background: var(--panel);
+  box-shadow: var(--shadow);
 }
 .media-viewer-top {
   display: flex;
@@ -1028,7 +1028,7 @@ h1, h2, h3, p { margin-top: 0; }
 }
 .media-viewer-heading b {
   font-size: 16px;
-  color: #eef3fb;
+  color: var(--text);
 }
 .media-viewer-heading small {
   color: var(--muted);
@@ -1041,16 +1041,16 @@ h1, h2, h3, p { margin-top: 0; }
   width: 36px;
   height: 36px;
   flex: 0 0 auto;
-  border: 1px solid #3a4556;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: #1a2230;
-  color: #e8eef8;
+  background: var(--panel-soft);
+  color: var(--text);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
 }
 .media-viewer-close:hover {
-  background: #243044;
+  background: var(--panel-hover);
 }
 .media-viewer-stage {
   min-height: 0;
@@ -1059,7 +1059,8 @@ h1, h2, h3, p { margin-top: 0; }
   place-items: center;
   overflow: auto;
   border-radius: 14px;
-  background: #0a0e14;
+  border: 1px solid var(--border);
+  background: var(--surface-deep, var(--page));
 }
 .media-viewer-media {
   display: block;
@@ -1437,17 +1438,6 @@ body[data-theme="light"] .recording-item { border-color: var(--border); }
 body[data-theme="light"] .recording-preview-wrap { border-color: var(--border); background: #e8ecf1; }
 body[data-theme="light"] .recording-actions .text-button { color: #445066; }
 body[data-theme="light"] .recording-actions .text-button.danger { color: #c43b55; }
-body[data-theme="light"] .media-viewer-dialog {
-  background: #f7f9fc;
-  border-color: #d5dde8;
-}
-body[data-theme="light"] .media-viewer-heading b { color: #1a2330; }
-body[data-theme="light"] .media-viewer-close {
-  background: #eef2f7;
-  border-color: #d5dde8;
-  color: #1a2330;
-}
-body[data-theme="light"] .media-viewer-stage { background: #e8edf4; }
 body[data-theme="light"] .sensor-name,
 body[data-theme="light"] .control-tile b,
 body[data-theme="light"] .heading-title h2 { color: #273750; }

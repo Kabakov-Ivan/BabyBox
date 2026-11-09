@@ -137,6 +137,14 @@ if [ -n "$BOOTCFG" ]; then
     echo 'dtoverlay=dht11,gpiopin=4' >> "$BOOTCFG"
   fi
   echo "DHT overlay set to dtoverlay=dht11,gpiopin=4 in $BOOTCFG (reboot if pin changed)"
+
+  # Power button: GPIO3 (pin 5) ↔ GND (pin 20). Same pin wakes Pi from halt.
+  if grep -q 'dtoverlay=gpio-shutdown' "$BOOTCFG"; then
+    sed -i 's/^dtoverlay=gpio-shutdown.*/dtoverlay=gpio-shutdown,gpio_pin=3,active_low=1,gpio_pull=up/' "$BOOTCFG"
+  else
+    echo 'dtoverlay=gpio-shutdown,gpio_pin=3,active_low=1,gpio_pull=up' >> "$BOOTCFG"
+  fi
+  echo "Power-button overlay set (GPIO3) in $BOOTCFG"
 fi
 
 echo "DHT-11 notes:"
@@ -145,3 +153,8 @@ echo "  - kernel overlay: dtoverlay=dht11,gpiopin=4"
 echo "  - separate service: sudo systemctl status babybox-dht"
 echo "  - check file: cat /tmp/babybox-dht.json"
 echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
+echo
+echo "Power button notes:"
+echo "  - Button: GPIO3 (phys pin 5) ↔ GND (phys pin 20)"
+echo "  - Press while running → shutdown"
+echo "  - Press while halted → power on"
