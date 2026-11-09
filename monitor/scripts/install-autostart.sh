@@ -38,9 +38,10 @@ apt-get install -y hostapd dnsmasq python3-picamera2 libgpiod2 ffmpeg
 # CSI camera / GPIO access for the web service user
 usermod -aG video,gpio "$USER_NAME" 2>/dev/null || true
 
-# Photos / clips gallery folder
+# Photos / clips gallery + sensor history folders
 SAVE_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/Save_BabyBox"
 install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR"
+install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR/camera"
 install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR/sensors"
 
 install -m 755 "${ROOT}/scripts/babybox-boot-wifi" /usr/local/sbin/babybox-boot-wifi
@@ -115,7 +116,7 @@ echo "  1) Boot → always AP BABY_BOX_SETUP / Sas23766732 + website"
 echo "  2) Phone → http://192.168.4.1:5000/wifi → enter home Wi-Fi"
 echo "  3) Pi joins home Wi-Fi → site on that network IP:5000"
 echo "  4) Camera page auto-loads MJPEG from http://<pi-ip>:5000/stream"
-echo "  5) Photos/videos save to ${SAVE_DIR} and show in Записи"
+echo "  5) Photos/videos save to ${SAVE_DIR}/camera and show in Записи"
 echo
 echo "Camera notes:"
 echo "  - venv must see system picamera2: python3 -m venv --system-site-packages ${APP_DIR}/.venv"

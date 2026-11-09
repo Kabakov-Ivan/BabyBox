@@ -1,4 +1,4 @@
-"""Saved photos / clips under /home/admin/Save_BabyBox."""
+"""Saved photos / clips under /home/admin/Save_BabyBox/camera."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-SAVE_DIR = Path(os.environ.get("BABYBOX_SAVE_DIR", "/home/admin/Save_BabyBox"))
+SAVE_DIR = Path(os.environ.get("BABYBOX_SAVE_DIR", "/home/admin/Save_BabyBox/camera"))
 SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v", ".avi", ".mjpeg", ".mjpg"}
