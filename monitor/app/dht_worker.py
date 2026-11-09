@@ -49,11 +49,14 @@ def write_status(payload: dict, *, keep_last_reading: bool = False) -> None:
         and current.get("temp_c") is not None
         and current.get("humidity_pct") is not None
     ):
+        # Transient IIO timeouts are normal for DHT — keep last good values clean.
         data["available"] = True
         data["temp_c"] = current["temp_c"]
         data["humidity_pct"] = current["humidity_pct"]
         data["temperature"] = current.get("temperature", current["temp_c"])
         data["humidity"] = current.get("humidity", current["humidity_pct"])
+        data["error"] = None
+        data["updated_at"] = current.get("updated_at", data["updated_at"])
 
     tmp = OUT_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=True), encoding="utf-8")
