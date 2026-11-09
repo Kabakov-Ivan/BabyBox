@@ -19,9 +19,6 @@ app = Flask(
 BOUNDARY_NAME = BOUNDARY.decode("ascii")
 IMG_DIR = MONITOR_ROOT / "img"
 
-# Kick off DHT-11 in a background thread so Flask never blocks on GPIO/Blinka.
-threading.Thread(target=dht.start, name="dht11-autostart", daemon=True).start()
-
 
 @app.route("/img/<path:filename>")
 def img_files(filename):
@@ -173,4 +170,6 @@ def wifi_connect():
 
 
 if __name__ == "__main__":
+    # Start DHT worker before Flask threads exist (avoids fork+thread hangs).
+    dht.start()
     app.run(host="0.0.0.0", port=5000, threaded=True)
