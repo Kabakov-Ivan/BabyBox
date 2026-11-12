@@ -1572,6 +1572,69 @@ body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] .control-ico
   color: #e0e4ea;
 }
 body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] small { color: #c2c8d0; }
+
+/* Owner profile, lullaby chooser, notification preview, PIN and screen lock. */
+.lock-button { border-radius: 12px; }
+.lock-button svg, .lock-mark svg, .profile-avatar-row svg {
+  display: block; width: 20px; height: 20px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.profile-form, .pin-form { width: 100%; max-width: 760px; gap: 16px; }
+.profile-avatar-row { display: flex; align-items: center; gap: 14px; }
+.profile-avatar-row img, .profile-avatar-row > span {
+  width: 76px; height: 76px; border-radius: 50%; object-fit: cover;
+  display: grid; place-items: center; border: 1px solid var(--border); background: var(--panel-hover); color: var(--muted);
+}
+.profile-avatar-row > span svg { width: 32px; height: 32px; }
+.profile-avatar-row label { margin: 0; cursor: pointer; }
+.profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.profile-fields label, .pin-form label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+.profile-fields .profile-email { grid-column: 1 / -1; }
+.profile-fields input, .pin-form input {
+  width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--border);
+  border-radius: 11px; background: var(--page); color: var(--text);
+}
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.form-status { color: var(--muted); font-size: 12px; }
+.form-status.is-error { color: #ff9aaa; }
+.lullaby-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lullaby-choice { display: grid; gap: 11px; align-content: start; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-soft); }
+.lullaby-choice b { font-size: 15px; }
+.lullaby-default-badge { color: var(--green); font-size: 12px; }
+.lullaby-default-badge[hidden] { display: none; }
+.lullaby-choice.is-default { border-color: var(--accent); }
+#lullabyAudio { width: 100%; max-width: 600px; margin-top: 15px; }
+.notification-card { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 14px; }
+.notification-card .settings-menu-icon { flex: 0 0 auto; }
+.notification-card > div { display: grid; gap: 5px; flex: 1; }
+.notification-card b { font-size: 14px; }
+.notification-card small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.pin-form { max-width: 460px; }
+.lock-screen {
+  position: fixed; z-index: 100; inset: 0; display: grid; place-items: center;
+  padding: 20px; background: rgb(5 9 15 / 94%); backdrop-filter: blur(18px);
+}
+.lock-screen[hidden] { display: none; }
+.lock-card { width: min(420px, 100%); display: grid; justify-items: center; gap: 14px; padding: 32px; text-align: center; border-radius: 20px; }
+.lock-mark { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px; background: var(--panel-hover); color: var(--accent); }
+.lock-mark svg { width: 26px; height: 26px; }
+.lock-card h1 { margin: 0; font-size: 22px; }
+.lock-card p { margin: 0; color: var(--muted); font-size: 14px; }
+#unlockForm { width: 100%; display: grid; gap: 12px; }
+#unlockPin { min-height: 50px; border: 1px solid var(--border); border-radius: 12px; background: var(--page); color: var(--text); text-align: center; font-size: 24px; letter-spacing: .35em; }
+#unlockStatus { min-height: 18px; color: #ff9aaa; font-size: 12px; }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(280px, 100%); margin: 0 auto; }
+.pin-pad button { min-height: 48px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-soft); color: var(--text); font-size: 19px; font-weight: 700; }
+.pin-pad button:hover { background: var(--panel-hover); }
+.pin-pad button[data-pin-action] { font-size: 12px; font-weight: 600; }
+.quality-tag, .sensor-state, .connection-pill, .device-status { border-radius: 999px; }
+@media (max-width: 700px) {
+  .profile-fields, .lullaby-list { grid-template-columns: 1fr; }
+  .profile-fields .profile-email { grid-column: auto; }
+  .form-actions { align-items: stretch; flex-direction: column; }
+  .form-actions .button { width: 100%; }
+  .notification-card { align-items: flex-start; }
+}
 body[data-palette="graphite"] .control-tile:hover:not(:disabled) { border-color: #4a5360; }
 body[data-palette="graphite"] .device-card { border-color: #2e353e; }
 body[data-palette="graphite"] .round-control,

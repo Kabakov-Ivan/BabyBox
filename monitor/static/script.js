@@ -213,12 +213,16 @@ $$('.settings-menu-item[data-settings]').forEach(item => {
   item.addEventListener('click', event => {
     if (event.target.closest('.switch')) return;
     const name = item.dataset.settings;
-    if (!name || name === 'pin') return;
+    if (!name) return;
     setSettingsPane(name === 'autonight' ? 'autonight' : name);
+    if (name === 'profile') loadProfile();
+    if (name === 'lullaby') loadLullabyChoices();
+    if (name === 'pin') loadPinStatus();
   });
 });
 
 $('#clearEventsBtn')?.addEventListener('click', clearEvents);
+setSettingsPane('profile');
 
 function setAutoNightlight(enabled, announce = true) {
   localStorage.setItem('radio-nanny-auto-nightlight', enabled ? '1' : '0');
@@ -694,6 +698,8 @@ function prepareAudio() {
 function stopPreview() {
   clearInterval(audioTimer);
   audioTimer = null;
+  const localAudio = $('#lullabyAudio');
+  if (localAudio && !localAudio.paused) localAudio.pause();
   audioNodes.forEach(node => { try { node.stop(); } catch {} });
   audioNodes = [];
 }
@@ -965,12 +971,28 @@ $$('.control-tile:not(:disabled)').forEach(button => {
 
     if (action === 'lullaby') {
       stopPreview();
+      const audio = $('#lullabyAudio');
       if (!enabling) {
+        audio?.pause();
         setControlState(button, false);
-        addEvent('Колыбельная: выключено', apiOnline ? 'Команда отправлена устройству' : 'Изменение в интерфейсе');
-        if (apiOnline) await sendCommand(action, false);
+        addEvent('Колыбельная: выключено', 'Воспроизведение остановлено на этом устройстве');
         return;
       }
+      if (audio?.src) {
+        try {
+          audio.currentTime = 0;
+          await audio.play();
+        } catch {
+          showToast('Не удалось запустить воспроизведение на этом устройстве.');
+          return;
+        }
+      } else {
+        try { playLullaby(); }
+        catch { showToast('Звуковое воспроизведение недоступно в этом браузере.'); return; }
+      }
+      setControlState(button, true);
+      addEvent('Колыбельная: играет', 'Воспроизведение на этом устройстве', 'green');
+      return;
     }
 
     if (apiOnline) {
@@ -994,3 +1016,227 @@ $$('.control-tile:not(:disabled)').forEach(button => {
 
 setDeviceConnection(false);
 startPolling(false);
+
+// Настройки владельца, выбранной мелодии и локальная блокировка панели.
+const profileForm = $('#profileForm');
+const profileAvatarInput = $('#profileAvatar');
+const profileAvatarPreview = $('#profileAvatarPreview');
+const profileAvatarFallback = $('#profileAvatarFallback');
+let selectedAvatarFile = null;
+
+function setFormStatus(id, message, error = false) {
+  const target = $(id);
+  if (!target) return;
+  target.textContent = message;
+  target.classList.toggle('is-error', error);
+}
+
+async function loadProfile() {
+  try {
+    const response = await fetch('/api/profile', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось прочитать профиль');
+    const profile = data.profile || {};
+    $('#profileFirstName').value = profile.first_name || '';
+    $('#profileLastName').value = profile.last_name || '';
+    $('#profileEmail').value = profile.email || '';
+    if (profile.avatar_url) {
+      profileAvatarPreview.src = profile.avatar_url;
+      profileAvatarPreview.hidden = false;
+      profileAvatarFallback.hidden = true;
+    }
+    setFormStatus('#profileSaveStatus', data.saved ? 'Профиль загружен с устройства.' : 'Профиль пока не заполнен.');
+  } catch (error) {
+    setFormStatus('#profileSaveStatus', error.message || 'Папка профиля недоступна — данные не сохранены.', true);
+  }
+}
+
+profileAvatarInput?.addEventListener('change', () => {
+  selectedAvatarFile = profileAvatarInput.files?.[0] || null;
+  if (!selectedAvatarFile) return;
+  if (selectedAvatarFile.size > 4 * 1024 * 1024) {
+    selectedAvatarFile = null;
+    profileAvatarInput.value = '';
+    showToast('Размер фото не должен превышать 4 МБ.');
+    return;
+  }
+  profileAvatarPreview.src = URL.createObjectURL(selectedAvatarFile);
+  profileAvatarPreview.hidden = false;
+  profileAvatarFallback.hidden = true;
+});
+
+profileForm?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const body = new FormData(profileForm);
+  if (selectedAvatarFile) body.set('avatar', selectedAvatarFile);
+  try {
+    const response = await fetch('/api/profile', { method: 'POST', body });
+    const data = await response.json();
+    if (!response.ok || !data.saved) throw new Error(data.error || 'Профиль не сохранён');
+    selectedAvatarFile = null;
+    if (data.profile.avatar_url) profileAvatarPreview.src = `${data.profile.avatar_url}?t=${Date.now()}`;
+    setFormStatus('#profileSaveStatus', 'Сохранено на устройстве BabyBox.');
+    showToast('Данные владельца сохранены.');
+  } catch (error) {
+    setFormStatus('#profileSaveStatus', error.message || 'Не удалось сохранить профиль.', true);
+  }
+});
+
+let lullabyChoices = [];
+let defaultLullaby = null;
+const lullabyAudio = $('#lullabyAudio');
+
+function setDefaultLullaby(filename) {
+  defaultLullaby = filename;
+  const selected = lullabyChoices.find(item => item.name === filename) || lullabyChoices[0];
+  if (selected && lullabyAudio) {
+    lullabyAudio.src = selected.url;
+    lullabyAudio.load();
+  }
+  $$('.lullaby-choice').forEach(card => {
+    const isDefault = card.dataset.file === filename;
+    card.classList.toggle('is-default', isDefault);
+    const badge = $('.lullaby-default-badge', card);
+    if (badge) badge.hidden = !isDefault;
+  });
+}
+
+async function loadLullabyChoices() {
+  const list = $('#lullabyList');
+  if (!list) return;
+  try {
+    const response = await fetch('/api/sounds', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось загрузить мелодии');
+    lullabyChoices = data.sounds || [];
+    list.replaceChildren();
+    if (!lullabyChoices.length) {
+      list.innerHTML = '<div class="empty-state">Аудиофайлы не найдены в папке sounds.</div>';
+      return;
+    }
+    lullabyChoices.forEach((sound, index) => {
+      const card = document.createElement('article');
+      card.className = 'lullaby-choice';
+      card.dataset.file = sound.name;
+      const title = document.createElement('b');
+      const titles = { 'lullaby-stars.wav': 'Звёзды', 'lullaby-moon.wav': 'Лунный свет', 'lullaby-dream.wav': 'Тихий сон' };
+      title.textContent = titles[sound.name] || sound.name.replace(/[-_.]/g, ' ');
+      const badge = document.createElement('small');
+      badge.className = 'lullaby-default-badge';
+      badge.textContent = 'По умолчанию';
+      badge.hidden = true;
+      const preview = document.createElement('button');
+      preview.type = 'button'; preview.className = 'button button-secondary'; preview.textContent = 'Прослушать';
+      preview.addEventListener('click', async () => {
+        lullabyAudio.src = sound.url;
+        try { lullabyAudio.currentTime = 0; await lullabyAudio.play(); }
+        catch { showToast('Не удалось воспроизвести аудиофайл.'); }
+      });
+      const makeDefault = document.createElement('button');
+      makeDefault.type = 'button'; makeDefault.className = 'button button-primary'; makeDefault.textContent = 'Выбрать по умолчанию';
+      makeDefault.addEventListener('click', async () => {
+        try {
+          const saved = await fetch('/api/sounds', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: sound.name }) });
+          const result = await saved.json();
+          if (!saved.ok || !result.saved) throw new Error(result.error || 'Не удалось сохранить мелодию');
+          setDefaultLullaby(sound.name);
+          showToast('Мелодия сохранена по умолчанию.');
+        } catch (error) { showToast(error.message || 'Не удалось сохранить мелодию.'); }
+      });
+      card.append(title, badge, preview, makeDefault);
+      list.append(card);
+    });
+    defaultLullaby = data.default || lullabyChoices[0].name;
+    setDefaultLullaby(defaultLullaby);
+  } catch (error) {
+    list.innerHTML = '';
+    const message = document.createElement('div');
+    message.className = 'empty-state'; message.textContent = error.message || 'Не удалось загрузить аудиофайлы.';
+    list.append(message);
+  }
+}
+
+lullabyAudio?.addEventListener('ended', () => {
+  stopPreview();
+  const button = $('.control-tile[data-action="lullaby"]');
+  if (button) setControlState(button, false);
+});
+
+$('#securityNotificationsBtn')?.addEventListener('click', event => {
+  const button = event.currentTarget;
+  button.setAttribute('aria-checked', String(button.getAttribute('aria-checked') !== 'true'));
+});
+
+async function loadPinStatus() {
+  try {
+    const response = await fetch('/api/pin/status', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'PIN-хранилище недоступно');
+    $('#currentPinField').hidden = !data.configured;
+    setFormStatus('#pinSaveStatus', data.configured ? 'PIN настроен. Для замены укажите текущий код.' : 'Задайте PIN из 4–8 цифр для блокировки панели.');
+  } catch (error) {
+    setFormStatus('#pinSaveStatus', error.message || 'Папка безопасности недоступна.', true);
+  }
+}
+
+$('#pinForm')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const pin = $('#newPin').value;
+  if (pin !== $('#confirmPin').value) {
+    setFormStatus('#pinSaveStatus', 'PIN-коды не совпадают.', true);
+    return;
+  }
+  try {
+    const response = await fetch('/api/pin/set', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin, current_pin: $('#currentPin').value }) });
+    const data = await response.json();
+    if (!response.ok || !data.saved) throw new Error(data.error || 'Не удалось сохранить PIN');
+    $('#pinForm').reset();
+    await loadPinStatus();
+    showToast('PIN-код сохранён.');
+  } catch (error) { setFormStatus('#pinSaveStatus', error.message || 'Не удалось сохранить PIN.', true); }
+});
+
+const lockScreen = $('#lockScreen');
+$('#lockBtn')?.addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/pin/status', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok || !data.configured) {
+      showToast(data.error || 'Сначала задайте PIN в Настройках.');
+      setView('settings'); setSettingsPane('pin'); await loadPinStatus();
+      return;
+    }
+    lockScreen.hidden = false;
+    document.body.dataset.locked = 'true';
+    $('#unlockPin').value = '';
+    $('#unlockStatus').textContent = '';
+    $('#unlockPin').focus();
+  } catch { showToast('PIN-хранилище недоступно на устройстве.'); }
+});
+
+$('#unlockForm')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  try {
+    const response = await fetch('/api/pin/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('#unlockPin').value }) });
+    const data = await response.json();
+    if (!response.ok || !data.unlocked) throw new Error(data.error || 'PIN-код не подошёл');
+    lockScreen.hidden = true;
+    document.body.dataset.locked = 'false';
+    $('#unlockPin').value = '';
+  } catch (error) {
+    $('#unlockStatus').textContent = error.message || 'PIN-код не подошёл.';
+    $('#unlockPin').value = '';
+    $('#unlockPin').focus();
+  }
+});
+
+$$('.pin-pad [data-pin-digit]').forEach(button => button.addEventListener('click', () => {
+  const input = $('#unlockPin');
+  if (input.value.length < 8) input.value += button.dataset.pinDigit;
+}));
+$$('.pin-pad [data-pin-action="clear"]').forEach(button => button.addEventListener('click', () => { $('#unlockPin').value = ''; }));
+$$('.pin-pad [data-pin-action="backspace"]').forEach(button => button.addEventListener('click', () => { $('#unlockPin').value = $('#unlockPin').value.slice(0, -1); }));
+
+loadLullabyChoices();
+loadProfile();
+loadPinStatus();
