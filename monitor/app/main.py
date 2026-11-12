@@ -10,6 +10,7 @@ from camera_stream import BOUNDARY, camera
 from dht_sensor import dht
 from media_store import media_store
 from nightlight import nightlight
+import settings_store
 from sensor_history import day_report
 
 # Start with LED off.
@@ -24,11 +25,148 @@ app = Flask(
 )
 BOUNDARY_NAME = BOUNDARY.decode("ascii")
 IMG_DIR = MONITOR_ROOT / "img"
+SOUNDS_DIR = MONITOR_ROOT / "sounds"
+AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 @app.route("/img/<path:filename>")
 def img_files(filename):
     return send_from_directory(IMG_DIR, filename)
+
+
+@app.route("/sounds/<path:filename>")
+def sound_file(filename):
+    return send_from_directory(SOUNDS_DIR, filename, conditional=True)
+
+
+@app.route("/api/profile", methods=["GET", "POST"])
+def api_profile():
+    if request.method == "GET":
+        try:
+            profile = settings_store.load_profile() or {}
+            avatar = profile.get("avatar")
+            profile["avatar_url"] = f"/api/profile/avatar/{avatar}" if avatar else None
+            return jsonify(profile=profile, saved=bool(profile))
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
+
+    first_name = request.form.get("first_name", "").strip()
+    last_name = request.form.get("last_name", "").strip()
+    email = request.form.get("email", "").strip()
+    if len(first_name) > 80 or len(last_name) > 80 or len(email) > 254:
+        return jsonify(error="Проверьте длину полей профиля"), 400
+    if email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+        return jsonify(error="Укажите корректный адрес почты"), 400
+
+    avatar_file = request.files.get("avatar")
+    avatar_name = None
+    if avatar_file and avatar_file.filename:
+        suffix = Path(avatar_file.filename).suffix.lower()
+        if suffix not in AVATAR_EXTENSIONS:
+            return jsonify(error="Аватар должен быть JPG, PNG или WebP"), 400
+        data = avatar_file.read(4 * 1024 * 1024 + 1)
+        if len(data) > 4 * 1024 * 1024:
+            return jsonify(error="Размер аватара не должен превышать 4 МБ"), 413
+        avatar_name = f"avatar{suffix}"
+        try:
+            settings_store.PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+            (settings_store.PROFILE_DIR / avatar_name).write_bytes(data)
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
+    else:
+        try:
+            old = settings_store.load_profile() or {}
+            avatar_name = old.get("avatar")
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
+
+    profile = {
+        "ts": int(time.time()),
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "avatar": avatar_name,
+    }
+    try:
+        settings_store.save_profile(profile)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
+    profile["avatar_url"] = f"/api/profile/avatar/{avatar_name}" if avatar_name else None
+    return jsonify(saved=True, profile=profile)
+
+
+@app.route("/api/profile/avatar/<path:filename>")
+def api_profile_avatar(filename):
+    if filename not in {"avatar.jpg", "avatar.jpeg", "avatar.png", "avatar.webp"}:
+        return jsonify(error="Файл не найден"), 404
+    try:
+        return send_from_directory(settings_store.PROFILE_DIR, filename)
+    except OSError:
+        return jsonify(error="Файл не найден"), 404
+
+
+@app.route("/api/sounds", methods=["GET", "POST"])
+def api_sounds():
+    sound_files = sorted(path.name for path in SOUNDS_DIR.glob("*.wav")) if SOUNDS_DIR.exists() else []
+    if request.method == "GET":
+        try:
+            selected = settings_store.load_sound_default()
+        except OSError:
+            selected = None
+        return jsonify(sounds=[{"name": name, "url": f"/sounds/{name}"} for name in sound_files],
+                       default=(selected or {}).get("file"))
+
+    filename = (request.get_json(silent=True) or {}).get("file", "")
+    if filename not in sound_files:
+        return jsonify(error="Выберите мелодию из списка"), 400
+    try:
+        settings_store.save_sound_default(filename)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке звуков на устройстве"), 503
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    return jsonify(saved=True, file=filename,
+                   path=f"~/BabyBox/monitor/sounds/{filename}")
+
+
+@app.route("/api/pin/status")
+def api_pin_status():
+    try:
+        return jsonify(configured=settings_store.pin_is_set())
+    except OSError:
+        return jsonify(configured=False, error="Нет доступа к папке безопасности на устройстве"), 503
+
+
+@app.route("/api/pin/set", methods=["POST"])
+def api_pin_set():
+    data = request.get_json(silent=True) or {}
+    pin = data.get("pin", "")
+    if not isinstance(pin, str) or not settings_store.PIN_PATTERN.fullmatch(pin):
+        return jsonify(error="PIN-код должен состоять из 4–8 цифр"), 400
+    try:
+        if settings_store.pin_is_set() and not settings_store.verify_pin(str(data.get("current_pin", ""))):
+            return jsonify(error="Текущий PIN-код не подошёл"), 403
+        settings_store.save_pin(pin)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке безопасности на устройстве"), 503
+    return jsonify(saved=True)
+
+
+@app.route("/api/pin/verify", methods=["POST"])
+def api_pin_verify():
+    data = request.get_json(silent=True) or {}
+    pin = data.get("pin", "")
+    if not isinstance(pin, str) or not settings_store.PIN_PATTERN.fullmatch(pin):
+        return jsonify(unlocked=False, error="Введите PIN-код из 4–8 цифр"), 400
+    try:
+        configured = settings_store.pin_is_set()
+        if not configured:
+            return jsonify(unlocked=False, error="PIN-код ещё не настроен"), 409
+        if not settings_store.verify_pin(pin):
+            return jsonify(unlocked=False, error="PIN-код не подошёл или включена пауза после ошибок"), 403
+    except OSError:
+        return jsonify(unlocked=False, error="Нет доступа к папке безопасности на устройстве"), 503
+    return jsonify(unlocked=True)
 
 
 def run_nmcli(args, timeout=20):
