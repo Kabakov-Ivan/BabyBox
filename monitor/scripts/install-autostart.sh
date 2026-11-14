@@ -43,6 +43,7 @@ SAVE_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/Save_BabyBox"
 install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR"
 install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR/camera"
 install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR/sensors"
+install -d -o "$USER_NAME" -g "$USER_NAME" -m 755 "$SAVE_DIR/nightlight"
 
 install -m 755 "${ROOT}/scripts/babybox-boot-wifi" /usr/local/sbin/babybox-boot-wifi
 install -m 755 "${ROOT}/scripts/babybox-wifi" /usr/local/sbin/babybox-wifi

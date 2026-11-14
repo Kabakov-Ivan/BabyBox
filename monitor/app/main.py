@@ -13,8 +13,9 @@ from nightlight import nightlight
 import settings_store
 from sensor_history import day_report
 
-# Start with LED off.
-nightlight.set(False)
+# Start with LED off, then follow light-sensor auto mode if enabled on disk.
+nightlight.set(False, source="auto")
+nightlight.start_auto_loop()
 
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
 
@@ -150,7 +151,12 @@ def api_autonight():
         except OSError:
             return jsonify(saved=False, error="Нет доступа к папке ночника на устройстве"), 503
         enabled = bool(row.get("enabled")) if row else False
-        return jsonify(saved=bool(row), enabled=enabled, nightlight=row)
+        return jsonify(
+            saved=bool(row),
+            enabled=enabled,
+            nightlight=row,
+            **nightlight.status(),
+        )
 
     data = request.get_json(silent=True) or {}
     enabled = bool(data.get("enabled"))
@@ -158,7 +164,8 @@ def api_autonight():
         row = settings_store.save_autonight(enabled)
     except OSError:
         return jsonify(saved=False, error="Нет доступа к папке ночника на устройстве"), 503
-    return jsonify(saved=True, enabled=row["enabled"], nightlight=row)
+    nightlight.set_auto_enabled(enabled)
+    return jsonify(saved=True, enabled=row["enabled"], nightlight=row, **nightlight.status())
 
 
 @app.route("/api/sounds", methods=["GET", "POST"])
@@ -294,13 +301,15 @@ def api_control():
     enabled = bool(data.get("enabled"))
 
     if action == "light":
-        ok = nightlight.set(enabled)
+        ok = nightlight.set(enabled, source="manual")
+        status = nightlight.status()
         if not ok:
             return jsonify(
-                error=nightlight.status().get("error") or "Не удалось переключить ночник",
+                error=status.get("error") or "Не удалось переключить ночник",
                 light=nightlight.is_on(),
+                **status,
             ), 500
-        return jsonify(ok=True, action="light", enabled=nightlight.is_on(), **nightlight.status())
+        return jsonify(ok=True, action="light", enabled=nightlight.is_on(), **status)
 
     if action == "lullaby":
         # Sound is handled in the browser for now.

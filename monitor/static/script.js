@@ -231,12 +231,6 @@ function applyAutoNightlightState(enabled) {
     if (!btn) return;
     btn.setAttribute('aria-checked', String(enabled));
   });
-  if (enabled) applyAutoNightlight();
-}
-
-function applyAutoNightlight() {
-  // Режим ждёт сигнал освещённости с устройства: ночник включается, когда в комнате гаснет свет.
-  if (localStorage.getItem('radio-nanny-auto-nightlight') !== '1') return;
 }
 
 async function setAutoNightlight(enabled, { persist = true } = {}) {
@@ -250,6 +244,14 @@ async function setAutoNightlight(enabled, { persist = true } = {}) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.saved) throw new Error(data.error || 'Автоночник не сохранён');
+    if (typeof data.enabled === 'boolean') applyAutoNightlightState(data.enabled);
+    if (Object.hasOwn(data, 'light')) {
+      const lightBtn = $('.control-tile[data-action="light"]');
+      if (lightBtn) {
+        setControlState(lightBtn, Boolean(data.light));
+        cameraStage?.classList.toggle('light-on', Boolean(data.light));
+      }
+    }
   } catch (error) {
     showToast(error.message || 'Не удалось сохранить автоночник на BabyBox.');
   }
@@ -845,6 +847,9 @@ function applyDevicePayload(payload) {
       cameraStage?.classList.toggle('light-on', on);
     }
   }
+  if (Object.hasOwn(payload, 'autonight_enabled')) {
+    applyAutoNightlightState(Boolean(payload.autonight_enabled));
+  }
 }
 
 function statusEndpoint() {
@@ -1019,11 +1024,24 @@ $$('.control-tile:not(:disabled)').forEach(button => {
     const enabling = button.getAttribute('aria-pressed') !== 'true';
 
     if (action === 'light') {
-      const accepted = await sendCommand(action, enabling);
-      if (!accepted) return;
-      setControlState(button, enabling);
-      cameraStage?.classList.toggle('light-on', enabling);
-      addEvent(`Ночник: ${enabling ? 'включено' : 'выключено'}`, 'Команда отправлена устройству', enabling ? 'green' : '');
+      try {
+        const response = await fetch(controlEndpoint(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, enabled: enabling })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        const on = Object.hasOwn(data, 'light') ? Boolean(data.light) : enabling;
+        setControlState(button, on);
+        cameraStage?.classList.toggle('light-on', on);
+        if (Object.hasOwn(data, 'autonight_enabled')) {
+          applyAutoNightlightState(Boolean(data.autonight_enabled));
+        }
+        addEvent(`Ночник: ${on ? 'включено' : 'выключено'}`, 'Команда отправлена устройству', on ? 'green' : '');
+      } catch (error) {
+        showToast(error.message || 'Не удалось переключить ночник.');
+      }
       return;
     }
 
