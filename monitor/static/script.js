@@ -1022,7 +1022,12 @@ const profileForm = $('#profileForm');
 const profileAvatarInput = $('#profileAvatar');
 const profileAvatarPreview = $('#profileAvatarPreview');
 const profileAvatarFallback = $('#profileAvatarFallback');
+const profileEditBtn = $('#profileEditBtn');
+const profileCancelBtn = $('#profileCancelBtn');
+const profileSaveBtn = $('#profileSaveBtn');
 let selectedAvatarFile = null;
+let profileSnapshot = null;
+let profileEditing = true;
 
 function setFormStatus(id, message, error = false) {
   const target = $(id);
@@ -1031,27 +1036,78 @@ function setFormStatus(id, message, error = false) {
   target.classList.toggle('is-error', error);
 }
 
+function applyProfileFields(profile = {}) {
+  $('#profileFirstName').value = profile.first_name || '';
+  $('#profileLastName').value = profile.last_name || '';
+  $('#profileEmail').value = profile.email || '';
+  if (profile.avatar_url) {
+    profileAvatarPreview.src = `${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    profileAvatarPreview.hidden = false;
+    profileAvatarFallback.hidden = true;
+  } else {
+    profileAvatarPreview.removeAttribute('src');
+    profileAvatarPreview.hidden = true;
+    profileAvatarFallback.hidden = false;
+  }
+}
+
+function setProfileEditing(enabled, { hasSaved = Boolean(profileSnapshot) } = {}) {
+  profileEditing = enabled;
+  profileForm?.classList.toggle('is-readonly', !enabled);
+  ['#profileFirstName', '#profileLastName', '#profileEmail'].forEach(selector => {
+    const input = $(selector);
+    if (input) input.readOnly = !enabled;
+  });
+  if (profileAvatarInput) profileAvatarInput.disabled = !enabled;
+  if (profileSaveBtn) profileSaveBtn.hidden = !enabled;
+  if (profileCancelBtn) profileCancelBtn.hidden = !enabled || !hasSaved;
+  if (profileEditBtn) profileEditBtn.hidden = enabled || !hasSaved;
+}
+
 async function loadProfile() {
   try {
     const response = await fetch('/api/profile', { cache: 'no-store' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не удалось прочитать профиль');
     const profile = data.profile || {};
-    $('#profileFirstName').value = profile.first_name || '';
-    $('#profileLastName').value = profile.last_name || '';
-    $('#profileEmail').value = profile.email || '';
-    if (profile.avatar_url) {
-      profileAvatarPreview.src = profile.avatar_url;
-      profileAvatarPreview.hidden = false;
-      profileAvatarFallback.hidden = true;
-    }
-    setFormStatus('#profileSaveStatus', data.saved ? 'Профиль загружен с устройства.' : 'Профиль пока не заполнен.');
+    selectedAvatarFile = null;
+    if (profileAvatarInput) profileAvatarInput.value = '';
+    profileSnapshot = data.saved ? {
+      first_name: profile.first_name || '',
+      last_name: profile.last_name || '',
+      email: profile.email || '',
+      avatar_url: profile.avatar_url || null,
+    } : null;
+    applyProfileFields(profileSnapshot || {});
+    setProfileEditing(!data.saved, { hasSaved: data.saved });
+    setFormStatus(
+      '#profileSaveStatus',
+      data.saved
+        ? 'Профиль загружен с устройства BabyBox.'
+        : 'Профиль пока не заполнен — заполните и сохраните.'
+    );
   } catch (error) {
+    profileSnapshot = null;
+    setProfileEditing(true, { hasSaved: false });
     setFormStatus('#profileSaveStatus', error.message || 'Папка профиля недоступна — данные не сохранены.', true);
   }
 }
 
+profileEditBtn?.addEventListener('click', () => {
+  setProfileEditing(true, { hasSaved: Boolean(profileSnapshot) });
+  setFormStatus('#profileSaveStatus', 'Редактирование. Изменения сохранятся на BabyBox.');
+});
+
+profileCancelBtn?.addEventListener('click', () => {
+  selectedAvatarFile = null;
+  if (profileAvatarInput) profileAvatarInput.value = '';
+  applyProfileFields(profileSnapshot || {});
+  setProfileEditing(false, { hasSaved: Boolean(profileSnapshot) });
+  setFormStatus('#profileSaveStatus', 'Изменения отменены.');
+});
+
 profileAvatarInput?.addEventListener('change', () => {
+  if (!profileEditing) return;
   selectedAvatarFile = profileAvatarInput.files?.[0] || null;
   if (!selectedAvatarFile) return;
   if (selectedAvatarFile.size > 4 * 1024 * 1024) {
@@ -1067,18 +1123,31 @@ profileAvatarInput?.addEventListener('change', () => {
 
 profileForm?.addEventListener('submit', async event => {
   event.preventDefault();
+  if (!profileEditing) return;
   const body = new FormData(profileForm);
   if (selectedAvatarFile) body.set('avatar', selectedAvatarFile);
+  profileSaveBtn.disabled = true;
   try {
     const response = await fetch('/api/profile', { method: 'POST', body });
     const data = await response.json();
     if (!response.ok || !data.saved) throw new Error(data.error || 'Профиль не сохранён');
     selectedAvatarFile = null;
-    if (data.profile.avatar_url) profileAvatarPreview.src = `${data.profile.avatar_url}?t=${Date.now()}`;
+    if (profileAvatarInput) profileAvatarInput.value = '';
+    const profile = data.profile || {};
+    profileSnapshot = {
+      first_name: profile.first_name || '',
+      last_name: profile.last_name || '',
+      email: profile.email || '',
+      avatar_url: profile.avatar_url || null,
+    };
+    applyProfileFields(profileSnapshot);
+    setProfileEditing(false, { hasSaved: true });
     setFormStatus('#profileSaveStatus', 'Сохранено на устройстве BabyBox.');
-    showToast('Данные владельца сохранены.');
+    showToast('Данные владельца сохранены на BabyBox.');
   } catch (error) {
     setFormStatus('#profileSaveStatus', error.message || 'Не удалось сохранить профиль.', true);
+  } finally {
+    profileSaveBtn.disabled = false;
   }
 });
 

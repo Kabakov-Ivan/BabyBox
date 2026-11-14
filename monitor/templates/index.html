@@ -308,9 +308,25 @@
             <div class="settings-pane active" data-pane="profile">
               <div class="settings-pane-head"><div><h2>Учётная запись</h2><p>Имя, фамилия, почта и фото владельца.</p></div></div>
               <form class="setting-block profile-form" id="profileForm">
-                <div class="profile-avatar-row"><img id="profileAvatarPreview" alt="Аватар владельца" hidden><span id="profileAvatarFallback" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><label class="button button-secondary" for="profileAvatar">Выбрать фото</label><input id="profileAvatar" type="file" accept="image/png,image/jpeg,image/webp" hidden></div>
-                <div class="profile-fields"><label>Имя<input id="profileFirstName" name="first_name" maxlength="80" autocomplete="given-name"></label><label>Фамилия<input id="profileLastName" name="last_name" maxlength="80" autocomplete="family-name"></label><label class="profile-email">Почта<input id="profileEmail" name="email" type="email" maxlength="254" autocomplete="email"></label></div>
-                <div class="form-actions"><small id="profileSaveStatus" class="form-status">Данные хранятся на устройстве BabyBox.</small><button class="button button-primary" type="submit">Сохранить</button></div>
+                <div class="profile-avatar-row">
+                  <img id="profileAvatarPreview" alt="Аватар владельца" hidden>
+                  <span id="profileAvatarFallback" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+                  <label class="button button-secondary" id="profileAvatarLabel" for="profileAvatar">Выбрать фото</label>
+                  <input id="profileAvatar" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+                </div>
+                <div class="profile-fields">
+                  <label>Имя<input id="profileFirstName" name="first_name" maxlength="80" autocomplete="given-name"></label>
+                  <label>Фамилия<input id="profileLastName" name="last_name" maxlength="80" autocomplete="family-name"></label>
+                  <label class="profile-email">Почта<input id="profileEmail" name="email" type="email" maxlength="254" autocomplete="email"></label>
+                </div>
+                <div class="form-actions">
+                  <small id="profileSaveStatus" class="form-status">Данные хранятся на устройстве BabyBox.</small>
+                  <div class="form-action-buttons">
+                    <button class="button button-secondary" id="profileEditBtn" type="button" hidden>Редактировать</button>
+                    <button class="button button-secondary" id="profileCancelBtn" type="button" hidden>Отмена</button>
+                    <button class="button button-primary" id="profileSaveBtn" type="submit">Сохранить</button>
+                  </div>
+                </div>
               </form>
             </div>
 

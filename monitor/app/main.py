@@ -58,8 +58,13 @@ def api_profile():
     if email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         return jsonify(error="Укажите корректный адрес почты"), 400
 
+    try:
+        old = settings_store.load_profile() or {}
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
+
     avatar_file = request.files.get("avatar")
-    avatar_name = None
+    avatar_name = old.get("avatar")
     if avatar_file and avatar_file.filename:
         suffix = Path(avatar_file.filename).suffix.lower()
         if suffix not in AVATAR_EXTENSIONS:
@@ -70,13 +75,13 @@ def api_profile():
         avatar_name = f"avatar{suffix}"
         try:
             settings_store.PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+            for stale in settings_store.PROFILE_DIR.glob("avatar.*"):
+                if stale.name != avatar_name:
+                    try:
+                        stale.unlink()
+                    except OSError:
+                        pass
             (settings_store.PROFILE_DIR / avatar_name).write_bytes(data)
-        except OSError:
-            return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
-    else:
-        try:
-            old = settings_store.load_profile() or {}
-            avatar_name = old.get("avatar")
         except OSError:
             return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
 
