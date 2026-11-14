@@ -5,7 +5,7 @@ Light DO:   BCM GPIO27 (phys pin 13), VCC 3.3V pin 1, GND pin 6
 
 Auto mode reads /home/admin/Save_BabyBox/nightlight/nightlight.jsonl
 (`enabled: true` → dark turns LED on, bright turns it off).
-Manual OFF while auto is enabled disables auto mode.
+Any manual LED control while auto is enabled disables auto mode.
 """
 
 from __future__ import annotations
@@ -105,11 +105,10 @@ class NightLight:
                 self._ensure_led()
                 drive_high = on if LED_ACTIVE_HIGH else (not on)
                 self._pinctrl("set", str(self.led_pin), "op", "dh" if drive_high else "dl")
-                was_on = self._on
                 self._on = bool(on)
                 self._error = None
-                if source == "manual" and was_on and not self._on and self._auto_enabled:
-                    # User turned off an auto-lit night light → leave auto mode.
+                if source == "manual" and self._auto_enabled:
+                    # Any manual control leaves auto mode (ON or OFF).
                     self._auto_enabled = False
                     disable_auto = True
                 log.info(
