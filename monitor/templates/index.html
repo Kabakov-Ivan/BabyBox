@@ -274,10 +274,11 @@
               <span class="settings-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
               <span class="settings-menu-copy"><b>Колыбельная</b><small>Мелодия по умолчанию</small></span>
             </button>
-            <button class="settings-menu-item" type="button" data-settings="notifications">
+            <div class="settings-menu-item settings-toggle-row" data-settings="notifications">
               <span class="settings-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg></span>
               <span class="settings-menu-copy"><b>Уведомления</b><small>Уведомления безопасности</small></span>
-            </button>
+              <button class="switch" id="securityNotificationsBtn" type="button" role="switch" aria-checked="false" aria-label="Уведомления безопасности" title="Уведомления"><i></i></button>
+            </div>
             <div class="settings-menu-item settings-toggle-row" data-settings="autonight">
               <span class="settings-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6m-5 4h4m-6-7a7 7 0 1 1 8 0c-1 .8-1.5 1.7-1.5 3h-5c0-1.3-.5-2.2-1.5-3Z"/></svg></span>
               <span class="settings-menu-copy"><b>Автоночник</b><small>Когда в комнате гаснет свет</small></span>
@@ -320,7 +321,7 @@
                   <label class="profile-email">Почта<input id="profileEmail" name="email" type="email" maxlength="254" autocomplete="email"></label>
                 </div>
                 <div class="form-actions">
-                  <small id="profileSaveStatus" class="form-status">Данные хранятся на устройстве BabyBox.</small>
+                  <small id="profileSaveStatus" class="form-status" hidden></small>
                   <div class="form-action-buttons">
                     <button class="button button-secondary" id="profileEditBtn" type="button" hidden>Редактировать</button>
                     <button class="button button-secondary" id="profileCancelBtn" type="button" hidden>Отмена</button>
@@ -337,8 +338,19 @@
             </div>
 
             <div class="settings-pane" data-pane="notifications" hidden>
-              <div class="settings-pane-head"><div><h2>Уведомления</h2><p>Настройка уведомлений безопасности на почту.</p></div></div>
-              <div class="setting-block notification-card"><span class="settings-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg></span><div><b>Получать уведомления безопасности на почту</b><small>Переключатель пока только меняет вид — отправка и сохранение не настроены.</small></div><button class="switch" id="securityNotificationsBtn" type="button" role="switch" aria-checked="false" aria-label="Уведомления безопасности на почту"><i></i></button></div>
+              <div class="settings-pane-head">
+                <h2>Уведомления</h2>
+                <p>Настройка уведомлений безопасности на почту.</p>
+              </div>
+              <div class="setting-block autonight-card">
+                <div class="autonight-row">
+                  <div>
+                    <h3>Уведомления на почту</h3>
+                    <p>Разрешите или запретите отправку вам сообщений безопасности на электронную почту.</p>
+                  </div>
+                  <button class="switch" id="securityNotificationsBtnDetail" type="button" role="switch" aria-checked="false" aria-label="Уведомления безопасности на почту"><i></i></button>
+                </div>
+              </div>
             </div>
 
             <div class="settings-pane" data-pane="pin" hidden>

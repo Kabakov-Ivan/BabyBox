@@ -15,7 +15,10 @@ from typing import Any
 
 SAVE_ROOT = Path(os.environ.get("BABYBOX_SAVE_ROOT", "/home/admin/Save_BabyBox"))
 PROFILE_DIR = SAVE_ROOT / "profile"
+THEME_DIR = SAVE_ROOT / "theme"
+NIGHTLIGHT_DIR = SAVE_ROOT / "nightlight"
 SOUND_SAVE_DIR = SAVE_ROOT / "sounds"
+THEME_PALETTES = frozenset({"blue", "graphite"})
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
 SECURITY_DIR = Path(os.environ.get("BABYBOX_PIN_DIR", str(MONITOR_ROOT / "security")))
 PIN_ITERATIONS = 180_000
@@ -64,6 +67,35 @@ def load_profile() -> dict[str, Any] | None:
 
 def save_profile(row: dict[str, Any]) -> None:
     _append(PROFILE_DIR, "profile.jsonl", row)
+
+
+def load_theme() -> dict[str, Any] | None:
+    return _latest(THEME_DIR / "theme.jsonl")
+
+
+def save_theme(palette: str) -> dict[str, Any]:
+    next_palette = "graphite" if palette == "graphite" else "blue"
+    if next_palette not in THEME_PALETTES:
+        raise ValueError("Неизвестная тема")
+    row = {
+        "ts": int(time.time()),
+        "palette": next_palette,
+    }
+    _replace_latest(THEME_DIR, "theme.jsonl", row)
+    return row
+
+
+def load_autonight() -> dict[str, Any] | None:
+    return _latest(NIGHTLIGHT_DIR / "nightlight.jsonl")
+
+
+def save_autonight(enabled: bool) -> dict[str, Any]:
+    row = {
+        "ts": int(time.time()),
+        "enabled": bool(enabled),
+    }
+    _replace_latest(NIGHTLIGHT_DIR, "nightlight.jsonl", row)
+    return row
 
 
 def save_sound_default(filename: str) -> None:

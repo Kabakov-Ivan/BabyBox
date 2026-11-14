@@ -114,7 +114,7 @@ body[data-theme="light"] .brand-logo-light { display: block; }
   gap: 8px;
   padding: 8px 12px;
   border: 1px solid var(--chip-border);
-  border-radius: 999px;
+  border-radius: 12px;
   background: linear-gradient(135deg, var(--chip-bg-a), var(--chip-bg-b));
   color: var(--chip-fg);
   font-size: 12px;
@@ -321,7 +321,7 @@ h1, h2, h3, p { margin-top: 0; }
 .panel-actions { display: flex; align-items: center; gap: 8px; }
 .quality-tag {
   padding: 7px 10px;
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--panel-soft);
   color: #aebce0;
   font-size: 11px;
@@ -691,7 +691,7 @@ h1, h2, h3, p { margin-top: 0; }
   display: inline-block;
   width: fit-content;
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 8px;
   background: #243248;
   color: #b1c1d8;
   font-size: 11px;
@@ -1594,7 +1594,8 @@ body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] small { colo
   width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--border);
   border-radius: 11px; background: var(--page); color: var(--text);
 }
-.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.form-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+.form-status { margin-right: auto; }
 .form-action-buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .form-status { color: var(--muted); font-size: 12px; }
 .form-status.is-error { color: #ff9aaa; }
@@ -1605,17 +1606,42 @@ body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] small { colo
 }
 .profile-form.is-readonly #profileAvatarLabel { display: none; }
 .lullaby-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.lullaby-choice { display: grid; gap: 11px; align-content: start; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-soft); }
+.lullaby-choice {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 11px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-soft);
+}
+.lullaby-choice-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 28px;
+}
 .lullaby-choice b { font-size: 15px; }
-.lullaby-default-badge { color: var(--green); font-size: 12px; }
+.lullaby-default-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #15382f;
+  color: #7fe5be;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
 .lullaby-default-badge[hidden] { display: none; }
 .lullaby-choice.is-default { border-color: var(--accent); }
 #lullabyAudio { width: 100%; max-width: 600px; margin-top: 15px; }
-.notification-card { width: 100%; max-width: 760px; display: flex; align-items: center; gap: 14px; }
-.notification-card .settings-menu-icon { flex: 0 0 auto; }
-.notification-card > div { display: grid; gap: 5px; flex: 1; }
-.notification-card b { font-size: 14px; }
-.notification-card small { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.form-status:empty,
+.form-status[hidden] { display: none; }
 .pin-form { max-width: 460px; }
 .lock-screen {
   position: fixed; z-index: 100; inset: 0; display: grid; place-items: center;
@@ -1634,14 +1660,13 @@ body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] small { colo
 .pin-pad button { min-height: 48px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-soft); color: var(--text); font-size: 19px; font-weight: 700; }
 .pin-pad button:hover { background: var(--panel-hover); }
 .pin-pad button[data-pin-action] { font-size: 12px; font-weight: 600; }
-.quality-tag, .sensor-state, .connection-pill, .device-status { border-radius: 999px; }
+.quality-tag, .sensor-state, .connection-pill, .device-status { border-radius: 10px; }
 @media (max-width: 700px) {
   .profile-fields, .lullaby-list { grid-template-columns: 1fr; }
   .profile-fields .profile-email { grid-column: auto; }
   .form-actions { align-items: stretch; flex-direction: column; }
   .form-action-buttons { width: 100%; }
   .form-action-buttons .button { flex: 1; min-width: 0; }
-  .notification-card { align-items: flex-start; }
 }
 body[data-palette="graphite"] .control-tile:hover:not(:disabled) { border-color: #4a5360; }
 body[data-palette="graphite"] .device-card { border-color: #2e353e; }

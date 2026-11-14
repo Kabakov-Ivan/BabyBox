@@ -119,6 +119,48 @@ def api_profile_avatar(filename):
         return jsonify(error="Файл не найден"), 404
 
 
+@app.route("/api/theme", methods=["GET", "POST"])
+def api_theme():
+    if request.method == "GET":
+        try:
+            theme = settings_store.load_theme() or {}
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке темы на устройстве"), 503
+        palette = theme.get("palette") if theme.get("palette") in {"blue", "graphite"} else "blue"
+        return jsonify(saved=bool(theme), palette=palette, theme=theme)
+
+    data = request.get_json(silent=True) or {}
+    palette = data.get("palette", "blue")
+    if palette not in {"blue", "graphite"}:
+        return jsonify(error="Выберите синюю или чёрную тему"), 400
+    try:
+        theme = settings_store.save_theme(palette)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке темы на устройстве"), 503
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    return jsonify(saved=True, palette=theme["palette"], theme=theme)
+
+
+@app.route("/api/autonight", methods=["GET", "POST"])
+def api_autonight():
+    if request.method == "GET":
+        try:
+            row = settings_store.load_autonight() or {}
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке ночника на устройстве"), 503
+        enabled = bool(row.get("enabled")) if row else False
+        return jsonify(saved=bool(row), enabled=enabled, nightlight=row)
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get("enabled"))
+    try:
+        row = settings_store.save_autonight(enabled)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке ночника на устройстве"), 503
+    return jsonify(saved=True, enabled=row["enabled"], nightlight=row)
+
+
 @app.route("/api/sounds", methods=["GET", "POST"])
 def api_sounds():
     sound_files = sorted(path.name for path in SOUNDS_DIR.glob("*.wav")) if SOUNDS_DIR.exists() else []

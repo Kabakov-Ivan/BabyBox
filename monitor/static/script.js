@@ -224,7 +224,7 @@ $$('.settings-menu-item[data-settings]').forEach(item => {
 $('#clearEventsBtn')?.addEventListener('click', clearEvents);
 setSettingsPane('profile');
 
-function setAutoNightlight(enabled, announce = true) {
+function applyAutoNightlightState(enabled) {
   localStorage.setItem('radio-nanny-auto-nightlight', enabled ? '1' : '0');
   ['#autoNightlightBtn', '#autoNightlightBtnDetail'].forEach(selector => {
     const btn = $(selector);
@@ -239,6 +239,34 @@ function applyAutoNightlight() {
   if (localStorage.getItem('radio-nanny-auto-nightlight') !== '1') return;
 }
 
+async function setAutoNightlight(enabled, { persist = true } = {}) {
+  applyAutoNightlightState(enabled);
+  if (!persist) return;
+  try {
+    const response = await fetch('/api/autonight', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !!enabled }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.saved) throw new Error(data.error || 'Автоночник не сохранён');
+  } catch (error) {
+    showToast(error.message || 'Не удалось сохранить автоночник на BabyBox.');
+  }
+}
+
+async function loadAutoNightlight() {
+  applyAutoNightlightState(localStorage.getItem('radio-nanny-auto-nightlight') === '1');
+  try {
+    const response = await fetch('/api/autonight', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось прочитать автоночник');
+    if (typeof data.enabled === 'boolean') applyAutoNightlightState(data.enabled);
+  } catch {
+    // Локальный кэш уже применён.
+  }
+}
+
 ['#autoNightlightBtn', '#autoNightlightBtnDetail'].forEach(selector => {
   $(selector)?.addEventListener('click', event => {
     event.stopPropagation();
@@ -248,7 +276,7 @@ function applyAutoNightlight() {
   });
 });
 
-setAutoNightlight(localStorage.getItem('radio-nanny-auto-nightlight') === '1', false);
+loadAutoNightlight();
 
 // Тема сохраняется в этом браузере.
 const savedTheme = localStorage.getItem('radio-nanny-theme');
@@ -259,7 +287,7 @@ $('#themeBtn').addEventListener('click', () => {
   localStorage.setItem('radio-nanny-theme', light ? 'light' : 'dark');
 });
 
-function setSitePalette(palette) {
+function applySitePalette(palette) {
   const next = palette === 'graphite' ? 'graphite' : 'blue';
   if (next === 'blue') delete document.body.dataset.palette;
   else document.body.dataset.palette = next;
@@ -271,12 +299,42 @@ function setSitePalette(palette) {
   });
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = next === 'graphite' ? '#14171b' : '#0b1423';
+  return next;
+}
+
+async function setSitePalette(palette, { persist = true } = {}) {
+  const next = applySitePalette(palette);
+  if (!persist) return next;
+  try {
+    const response = await fetch('/api/theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ palette: next }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.saved) throw new Error(data.error || 'Тема не сохранена');
+  } catch (error) {
+    showToast(error.message || 'Не удалось сохранить тему на BabyBox.');
+  }
+  return next;
+}
+
+async function loadSitePalette() {
+  applySitePalette(localStorage.getItem('radio-nanny-palette') || 'blue');
+  try {
+    const response = await fetch('/api/theme', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось прочитать тему');
+    if (data.palette) applySitePalette(data.palette);
+  } catch {
+    // Локальный кэш уже применён — устройство может быть ещё без папки theme.
+  }
 }
 
 $$('.theme-choice').forEach(btn => {
   btn.addEventListener('click', () => setSitePalette(btn.dataset.palette));
 });
-setSitePalette(localStorage.getItem('radio-nanny-palette') || 'blue');
+loadSitePalette();
 
 // Локальный MJPEG с /stream (CSI-камера на устройстве).
 const cameraStage = $('#cameraStage');
@@ -1032,7 +1090,9 @@ let profileEditing = true;
 function setFormStatus(id, message, error = false) {
   const target = $(id);
   if (!target) return;
-  target.textContent = message;
+  const text = message || '';
+  target.textContent = text;
+  target.hidden = !text;
   target.classList.toggle('is-error', error);
 }
 
@@ -1094,12 +1154,7 @@ async function loadProfile() {
     applyProfileFields(profileSnapshot || {});
     // Пустой профиль сразу открыт для ввода; заполненный — через «Редактировать».
     setProfileEditing(!hasContent, { hasSaved: hasContent });
-    setFormStatus(
-      '#profileSaveStatus',
-      hasContent
-        ? 'Профиль загружен с устройства BabyBox.'
-        : 'Профиль пока не заполнен — заполните и сохраните.'
-    );
+    setFormStatus('#profileSaveStatus', '');
   } catch (error) {
     profileSnapshot = null;
     setProfileEditing(true, { hasSaved: false });
@@ -1109,7 +1164,7 @@ async function loadProfile() {
 
 profileEditBtn?.addEventListener('click', () => {
   setProfileEditing(true, { hasSaved: Boolean(profileSnapshot) });
-  setFormStatus('#profileSaveStatus', 'Редактирование. Изменения сохранятся на BabyBox.');
+  setFormStatus('#profileSaveStatus', '');
   $('#profileFirstName')?.focus();
 });
 
@@ -1118,7 +1173,7 @@ profileCancelBtn?.addEventListener('click', () => {
   if (profileAvatarInput) profileAvatarInput.value = '';
   applyProfileFields(profileSnapshot || {});
   setProfileEditing(false, { hasSaved: Boolean(profileSnapshot) });
-  setFormStatus('#profileSaveStatus', 'Изменения отменены.');
+  setFormStatus('#profileSaveStatus', '');
 });
 
 profileAvatarInput?.addEventListener('change', () => {
@@ -1158,7 +1213,7 @@ profileForm?.addEventListener('submit', async event => {
     applyProfileFields(profileSnapshot);
     const hasContent = profileHasContent(profileSnapshot);
     setProfileEditing(!hasContent, { hasSaved: hasContent });
-    setFormStatus('#profileSaveStatus', 'Сохранено на устройстве BabyBox.');
+    setFormStatus('#profileSaveStatus', '');
     showToast('Данные владельца сохранены на BabyBox.');
   } catch (error) {
     setFormStatus('#profileSaveStatus', error.message || 'Не удалось сохранить профиль.', true);
@@ -1199,10 +1254,12 @@ async function loadLullabyChoices() {
       list.innerHTML = '<div class="empty-state">Аудиофайлы не найдены в папке sounds.</div>';
       return;
     }
-    lullabyChoices.forEach((sound, index) => {
+    lullabyChoices.forEach((sound) => {
       const card = document.createElement('article');
       card.className = 'lullaby-choice';
       card.dataset.file = sound.name;
+      const top = document.createElement('div');
+      top.className = 'lullaby-choice-top';
       const title = document.createElement('b');
       const titles = { 'lullaby-stars.wav': 'Звёзды', 'lullaby-moon.wav': 'Лунный свет', 'lullaby-dream.wav': 'Тихий сон' };
       title.textContent = titles[sound.name] || sound.name.replace(/[-_.]/g, ' ');
@@ -1210,6 +1267,7 @@ async function loadLullabyChoices() {
       badge.className = 'lullaby-default-badge';
       badge.textContent = 'По умолчанию';
       badge.hidden = true;
+      top.append(title, badge);
       const preview = document.createElement('button');
       preview.type = 'button'; preview.className = 'button button-secondary'; preview.textContent = 'Прослушать';
       preview.addEventListener('click', async () => {
@@ -1228,7 +1286,7 @@ async function loadLullabyChoices() {
           showToast('Мелодия сохранена по умолчанию.');
         } catch (error) { showToast(error.message || 'Не удалось сохранить мелодию.'); }
       });
-      card.append(title, badge, preview, makeDefault);
+      card.append(top, preview, makeDefault);
       list.append(card);
     });
     defaultLullaby = data.default || lullabyChoices[0].name;
@@ -1247,10 +1305,25 @@ lullabyAudio?.addEventListener('ended', () => {
   if (button) setControlState(button, false);
 });
 
-$('#securityNotificationsBtn')?.addEventListener('click', event => {
-  const button = event.currentTarget;
-  button.setAttribute('aria-checked', String(button.getAttribute('aria-checked') !== 'true'));
+function setSecurityNotifications(enabled) {
+  localStorage.setItem('radio-nanny-security-notifications', enabled ? '1' : '0');
+  ['#securityNotificationsBtn', '#securityNotificationsBtnDetail'].forEach(selector => {
+    const btn = $(selector);
+    if (!btn) return;
+    btn.setAttribute('aria-checked', String(enabled));
+  });
+}
+
+['#securityNotificationsBtn', '#securityNotificationsBtnDetail'].forEach(selector => {
+  $(selector)?.addEventListener('click', event => {
+    event.stopPropagation();
+    const enabled = $(selector).getAttribute('aria-checked') !== 'true';
+    setSecurityNotifications(enabled);
+    setSettingsPane('notifications');
+  });
 });
+
+setSecurityNotifications(localStorage.getItem('radio-nanny-security-notifications') === '1');
 
 async function loadPinStatus() {
   try {
