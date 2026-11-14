@@ -1036,6 +1036,16 @@ function setFormStatus(id, message, error = false) {
   target.classList.toggle('is-error', error);
 }
 
+function profileHasContent(profile = {}) {
+  return Boolean(
+    String(profile.first_name || '').trim()
+    || String(profile.last_name || '').trim()
+    || String(profile.email || '').trim()
+    || profile.avatar_url
+    || profile.avatar
+  );
+}
+
 function applyProfileFields(profile = {}) {
   $('#profileFirstName').value = profile.first_name || '';
   $('#profileLastName').value = profile.last_name || '';
@@ -1056,7 +1066,9 @@ function setProfileEditing(enabled, { hasSaved = Boolean(profileSnapshot) } = {}
   profileForm?.classList.toggle('is-readonly', !enabled);
   ['#profileFirstName', '#profileLastName', '#profileEmail'].forEach(selector => {
     const input = $(selector);
-    if (input) input.readOnly = !enabled;
+    if (!input) return;
+    input.readOnly = !enabled;
+    input.disabled = false;
   });
   if (profileAvatarInput) profileAvatarInput.disabled = !enabled;
   if (profileSaveBtn) profileSaveBtn.hidden = !enabled;
@@ -1072,17 +1084,19 @@ async function loadProfile() {
     const profile = data.profile || {};
     selectedAvatarFile = null;
     if (profileAvatarInput) profileAvatarInput.value = '';
-    profileSnapshot = data.saved ? {
+    const hasContent = data.saved === true || profileHasContent(profile);
+    profileSnapshot = hasContent ? {
       first_name: profile.first_name || '',
       last_name: profile.last_name || '',
       email: profile.email || '',
       avatar_url: profile.avatar_url || null,
     } : null;
     applyProfileFields(profileSnapshot || {});
-    setProfileEditing(!data.saved, { hasSaved: data.saved });
+    // Пустой профиль сразу открыт для ввода; заполненный — через «Редактировать».
+    setProfileEditing(!hasContent, { hasSaved: hasContent });
     setFormStatus(
       '#profileSaveStatus',
-      data.saved
+      hasContent
         ? 'Профиль загружен с устройства BabyBox.'
         : 'Профиль пока не заполнен — заполните и сохраните.'
     );
@@ -1096,6 +1110,7 @@ async function loadProfile() {
 profileEditBtn?.addEventListener('click', () => {
   setProfileEditing(true, { hasSaved: Boolean(profileSnapshot) });
   setFormStatus('#profileSaveStatus', 'Редактирование. Изменения сохранятся на BabyBox.');
+  $('#profileFirstName')?.focus();
 });
 
 profileCancelBtn?.addEventListener('click', () => {
@@ -1141,7 +1156,8 @@ profileForm?.addEventListener('submit', async event => {
       avatar_url: profile.avatar_url || null,
     };
     applyProfileFields(profileSnapshot);
-    setProfileEditing(false, { hasSaved: true });
+    const hasContent = profileHasContent(profileSnapshot);
+    setProfileEditing(!hasContent, { hasSaved: hasContent });
     setFormStatus('#profileSaveStatus', 'Сохранено на устройстве BabyBox.');
     showToast('Данные владельца сохранены на BabyBox.');
   } catch (error) {

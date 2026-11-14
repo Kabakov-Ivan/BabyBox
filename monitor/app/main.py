@@ -39,6 +39,15 @@ def sound_file(filename):
     return send_from_directory(SOUNDS_DIR, filename, conditional=True)
 
 
+def _profile_has_content(profile: dict) -> bool:
+    return bool(
+        str(profile.get("first_name") or "").strip()
+        or str(profile.get("last_name") or "").strip()
+        or str(profile.get("email") or "").strip()
+        or profile.get("avatar")
+    )
+
+
 @app.route("/api/profile", methods=["GET", "POST"])
 def api_profile():
     if request.method == "GET":
@@ -46,7 +55,7 @@ def api_profile():
             profile = settings_store.load_profile() or {}
             avatar = profile.get("avatar")
             profile["avatar_url"] = f"/api/profile/avatar/{avatar}" if avatar else None
-            return jsonify(profile=profile, saved=bool(profile))
+            return jsonify(profile=profile, saved=_profile_has_content(profile))
         except OSError:
             return jsonify(saved=False, error="Нет доступа к папке профиля на устройстве"), 503
 

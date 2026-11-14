@@ -1599,10 +1599,9 @@ body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] small { colo
 .form-status { color: var(--muted); font-size: 12px; }
 .form-status.is-error { color: #ff9aaa; }
 .profile-form.is-readonly input {
-  pointer-events: none;
-  opacity: .92;
   color: var(--text);
   background: var(--panel-soft);
+  cursor: default;
 }
 .profile-form.is-readonly #profileAvatarLabel { display: none; }
 .lullaby-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
