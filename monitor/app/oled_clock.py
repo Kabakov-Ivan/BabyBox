@@ -9,8 +9,8 @@ Wiring (physical pins → BCM):
 Screens (priority):
   1) lamp   — night light toggled ON from panel (3s), then fallback
   2) music  — lullaby playing
-  3) wifi   — setup AP is up (hostapd)
-  4) time   — default HH:MM
+  3) time   — only after home Wi-Fi (wlan0 IP, not 192.168.4.x)
+  4) wifi   — default from boot / setup AP / until home Wi-Fi is up
 """
 
 from __future__ import annotations
@@ -120,14 +120,38 @@ def _hostapd_active() -> bool:
         return False
 
 
+def _home_wifi_ready() -> bool:
+    """True only after leaving setup AP and getting a real wlan0 address."""
+    if _hostapd_active():
+        return False
+    try:
+        out = subprocess.check_output(
+            ["ip", "-4", "-o", "addr", "show", "dev", "wlan0"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=1.0,
+        )
+    except Exception:
+        return False
+
+    for token in out.split():
+        if token.count(".") == 3 and "/" in token:
+            ip = token.split("/", 1)[0]
+            # Setup AP uses 192.168.4.1 — that is still "wifi" mode.
+            if ip and not ip.startswith("192.168.4."):
+                return True
+    return False
+
+
 def _resolve_mode(status: dict, now: float) -> str:
     if float(status.get("lamp_until") or 0) > now:
         return "lamp"
     if status.get("lullaby"):
         return "music"
-    if _hostapd_active():
-        return "wifi"
-    return "time"
+    # Boot / AP / connecting → wifi icon. Time only on home Wi-Fi.
+    if _home_wifi_ready():
+        return "time"
+    return "wifi"
 
 
 def _draw_wifi(draw) -> None:
@@ -263,9 +287,14 @@ def main() -> int:
     image = Image.new("1", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
     font = _largest_font(draw, "88:88", font_path, WIDTH - 4, HEIGHT - 4)
-    last_key = None
 
-    log.info("OLED UI started")
+    # Paint Wi-Fi immediately on boot — don't wait for hostapd/network checks.
+    draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
+    _draw_wifi(draw)
+    display.image(image)
+    display.show()
+    last_key = ("wifi", "")
+    log.info("OLED UI started (wifi)")
 
     try:
         while not stop:

@@ -1,6 +1,9 @@
 [Unit]
 Description=BabyBox OLED clock (SSD1306)
-After=multi-user.target
+# Start as early as possible so Wi-Fi icon appears right after boot.
+DefaultDependencies=no
+After=local-fs.target
+Before=babybox-boot-wifi.service babybox-web.service
 Wants=time-sync.target
 
 [Service]
@@ -17,7 +20,7 @@ Environment=OLED_POLL_SEC=0.25
 Environment=OLED_STATUS_FILE=/tmp/babybox-oled.json
 ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/oled_clock.py
 Restart=always
-RestartSec=3
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
