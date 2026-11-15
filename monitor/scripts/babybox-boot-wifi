@@ -5,6 +5,9 @@ set -euo pipefail
 AP_SSID="BABY_BOX_SETUP"
 AP_IP="192.168.4.1"
 
+# OLED: show Wi-Fi icon from the very start of boot (never fail the script).
+rm -f /tmp/babybox-oled-ready || true
+
 logger -t babybox-boot-wifi "waiting for NetworkManager"
 for _ in $(seq 1 30); do
   if systemctl is-active --quiet NetworkManager; then

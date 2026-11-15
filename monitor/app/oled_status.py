@@ -1,7 +1,8 @@
-"""OLED overlays for BabyBox (/tmp/babybox-oled.json).
+"""OLED state for BabyBox.
 
-Only lamp (3s) and lullaby. Default screen stays the clock.
-Does not touch Wi-Fi / boot scripts.
+/tmp/babybox-oled.json  — lamp (3s) + lullaby
+/tmp/babybox-oled-ready — exists after home Wi-Fi connect → show clock
+                          missing on boot → show Wi-Fi icon
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 STATUS_FILE = Path(os.environ.get("OLED_STATUS_FILE", "/tmp/babybox-oled.json"))
+READY_FLAG = Path(os.environ.get("OLED_READY_FLAG", "/tmp/babybox-oled-ready"))
 LAMP_SEC = float(os.environ.get("OLED_LAMP_SEC", "3"))
 
 
@@ -40,6 +42,7 @@ def _write(payload: dict[str, Any]) -> None:
 def load() -> dict[str, Any]:
     data = _read()
     return {
+        "ready": READY_FLAG.exists(),
         "lullaby": bool(data.get("lullaby")),
         "lamp_until": float(data.get("lamp_until") or 0),
         "updated_at": data.get("updated_at"),

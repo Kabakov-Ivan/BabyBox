@@ -2,10 +2,11 @@
 
 Wiring: GND→9, VDD→17, SDA→15 (BCM22), SCK→16 (BCM23)
 
-Default: large HH:MM
-Overlays from panel (via /tmp/babybox-oled.json):
-  lamp  — night light ON, 3 seconds, then back to clock/music
+Screens:
+  wifi  — until /tmp/babybox-oled-ready appears (boot / setup AP)
+  time  — after home Wi-Fi connect
   music — lullaby playing
+  lamp  — night light ON for 3 seconds
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ I2C_ADDRS = [
 WIDTH = int(os.environ.get("OLED_WIDTH", "128"))
 HEIGHT = int(os.environ.get("OLED_HEIGHT", "64"))
 POLL_SEC = float(os.environ.get("OLED_POLL_SEC", "0.25"))
+READY_FLAG = Path(os.environ.get("OLED_READY_FLAG", "/tmp/babybox-oled-ready"))
 
 FONT_CANDIDATES = [
     Path(os.environ["OLED_FONT"]) if os.environ.get("OLED_FONT") else None,
@@ -106,7 +108,11 @@ def _load_status() -> dict:
 
         return load()
     except Exception:
-        return {"lullaby": False, "lamp_until": 0}
+        return {
+            "ready": READY_FLAG.exists(),
+            "lullaby": False,
+            "lamp_until": 0,
+        }
 
 
 def _resolve_mode(status: dict, now: float) -> str:
@@ -114,7 +120,17 @@ def _resolve_mode(status: dict, now: float) -> str:
         return "lamp"
     if status.get("lullaby"):
         return "music"
-    return "time"
+    # No ready-flag → Wi-Fi icon. Flag is created after home Wi-Fi connect.
+    if status.get("ready") or READY_FLAG.exists():
+        return "time"
+    return "wifi"
+
+
+def _draw_wifi(draw) -> None:
+    cx, cy = WIDTH // 2, HEIGHT // 2 + 8
+    for r in (16, 17, 24, 25, 32, 33):
+        draw.arc([cx - r, cy - r, cx + r, cy + r], start=220, end=320, fill=255)
+    draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=255)
 
 
 def _draw_music(draw) -> None:
@@ -219,7 +235,9 @@ def main() -> int:
 
                 if key != last_key:
                     draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
-                    if mode == "music":
+                    if mode == "wifi":
+                        _draw_wifi(draw)
+                    elif mode == "music":
                         _draw_music(draw)
                     elif mode == "lamp":
                         _draw_lamp(draw)
