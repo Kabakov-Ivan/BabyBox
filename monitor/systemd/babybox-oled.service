@@ -1,6 +1,6 @@
 [Unit]
 Description=BabyBox OLED clock (SSD1306)
-After=local-fs.target
+After=multi-user.target
 Wants=time-sync.target
 
 [Service]
@@ -13,9 +13,7 @@ Environment=PYTHONUNBUFFERED=1
 Environment=OLED_SCL_BCM=23
 Environment=OLED_SDA_BCM=22
 Environment=OLED_I2C_ADDR=0x3C,0x3D
-Environment=OLED_POLL_SEC=0.25
-Environment=OLED_STATUS_FILE=/tmp/babybox-oled.json
-Environment=OLED_READY_FLAG=/tmp/babybox-oled-ready
+Environment=OLED_POLL_SEC=1
 ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/oled_clock.py
 Restart=always
 RestartSec=3

@@ -31,7 +31,4 @@ ip link set wlan0 up
 systemctl start hostapd
 systemctl start dnsmasq
 
-# OLED: Wi-Fi icon until home Wi-Fi connects (never fail the AP if this errors).
-rm -f /tmp/babybox-oled-ready || true
-
 logger -t babybox-boot-wifi "AP is up at http://${AP_IP}:5000/wifi"

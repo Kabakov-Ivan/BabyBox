@@ -1,10 +1,14 @@
-"""OLED UI on SSD1306 128x64 (soft / bitbang I2C).
+"""OLED clock on SSD1306 128x64 (soft / bitbang I2C).
 
-Wiring: GND→9, VDD→17, SDA→15 (BCM22), SCK→16 (BCM23)
+Wiring (physical pins → BCM):
+  GND → pin 9
+  VDD → pin 17 (3.3V)
+  SDA → pin 15 (BCM GPIO22)
+  SCK → pin 16 (BCM GPIO23)
 
-Boot → Wi-Fi icon
-Home Wi-Fi connected (/tmp/babybox-oled-ready) → time
-Panel: lullaby → music, nightlight ON → lamp 3s
+Must use adafruit_bitbangio — Blinka bitbangio is stubbed on Linux, and
+busio.I2C only talks to /dev/i2c-* (hardware I2C1 pins 3/5 stay free
+for the power button on BCM GPIO3).
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ log = logging.getLogger("oled_clock")
 
 SCL_BCM = int(os.environ.get("OLED_SCL_BCM", "23"))
 SDA_BCM = int(os.environ.get("OLED_SDA_BCM", "22"))
+# Comma-separated list; first successful address wins.
 I2C_ADDRS = [
     int(x.strip(), 0)
     for x in os.environ.get("OLED_I2C_ADDR", "0x3C,0x3D").split(",")
@@ -33,8 +38,7 @@ I2C_ADDRS = [
 ]
 WIDTH = int(os.environ.get("OLED_WIDTH", "128"))
 HEIGHT = int(os.environ.get("OLED_HEIGHT", "64"))
-POLL_SEC = float(os.environ.get("OLED_POLL_SEC", "0.25"))
-READY_FLAG = Path(os.environ.get("OLED_READY_FLAG", "/tmp/babybox-oled-ready"))
+POLL_SEC = float(os.environ.get("OLED_POLL_SEC", "1.0"))
 
 FONT_CANDIDATES = [
     Path(os.environ["OLED_FONT"]) if os.environ.get("OLED_FONT") else None,
@@ -100,100 +104,18 @@ def _open_display(i2c):
     raise RuntimeError(f"SSD1306 not found on {I2C_ADDRS}: {last_exc}")
 
 
-def _load_status() -> dict:
-    try:
-        from oled_status import load
-
-        return load()
-    except Exception:
-        return {
-            "ready": READY_FLAG.exists(),
-            "lullaby": False,
-            "lamp_until": 0,
-        }
-
-
-def _resolve_mode(status: dict, now: float) -> str:
-    if float(status.get("lamp_until") or 0) > now:
-        return "lamp"
-    if status.get("lullaby"):
-        return "music"
-    if status.get("ready") or READY_FLAG.exists():
-        return "time"
-    return "wifi"
-
-
-def _draw_wifi(draw) -> None:
-    """Wi-Fi arcs without arc(width=…) — more reliable on 1-bit OLED."""
-    cx, cy = WIDTH // 2, HEIGHT // 2 + 8
-    for r in (16, 17, 24, 25, 32, 33):
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=220, end=320, fill=255)
-    draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=255)
-
-
-def _draw_music(draw) -> None:
-    hx, hy = WIDTH // 2 - 8, HEIGHT // 2 + 12
-    draw.ellipse([hx - 10, hy - 8, hx + 10, hy + 8], fill=255)
-    stem_x = hx + 8
-    draw.rectangle([stem_x, hy - 32, stem_x + 4, hy], fill=255)
-    draw.polygon(
-        [
-            (stem_x + 4, hy - 32),
-            (stem_x + 24, hy - 24),
-            (stem_x + 24, hy - 16),
-            (stem_x + 4, hy - 22),
-        ],
-        fill=255,
-    )
-
-
-def _draw_lamp(draw) -> None:
-    cx, cy = WIDTH // 2, HEIGHT // 2 - 2
-    for x1, y1, x2, y2 in (
-        (cx, cy - 30, cx, cy - 22),
-        (cx - 20, cy - 22, cx - 14, cy - 16),
-        (cx + 20, cy - 22, cx + 14, cy - 16),
-        (cx - 26, cy - 4, cx - 18, cy - 4),
-        (cx + 26, cy - 4, cx + 18, cy - 4),
-    ):
-        draw.line([(x1, y1), (x2, y2)], fill=255)
-
-    draw.ellipse([cx - 14, cy - 18, cx + 14, cy + 10], outline=255)
-    draw.rectangle([cx - 6, cy + 10, cx + 6, cy + 22], outline=255)
-    draw.line([(cx - 4, cy + 14), (cx + 4, cy + 14)], fill=255)
-    draw.line([(cx - 4, cy + 18), (cx + 4, cy + 18)], fill=255)
-    draw.ellipse([cx - 3, cy + 22, cx + 3, cy + 28], fill=255)
-
-
-def _draw_time(draw, font, text: str) -> None:
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    x = (WIDTH - tw) // 2 - bbox[0]
-    y = (HEIGHT - th) // 2 - bbox[1]
-    draw.text((x, y), text, font=font, fill=255)
-
-
-def _paint(display, image, draw, font, mode: str, clock_text: str) -> None:
-    draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
-    if mode == "wifi":
-        _draw_wifi(draw)
-    elif mode == "music":
-        _draw_music(draw)
-    elif mode == "lamp":
-        _draw_lamp(draw)
-    else:
-        _draw_time(draw, font, clock_text)
-    display.image(image)
-    display.show()
-
-
 def main() -> int:
     try:
         import adafruit_bitbangio as bitbangio
+        import adafruit_ssd1306  # noqa: F401
         from PIL import Image, ImageDraw
     except ImportError as exc:
-        log.error("Missing dependency: %s", exc)
+        log.error(
+            "Missing dependency: %s. "
+            "Install: pip install adafruit-circuitpython-ssd1306 "
+            "adafruit-circuitpython-bitbangio Pillow",
+            exc,
+        )
         return 1
 
     stop = False
@@ -208,16 +130,18 @@ def main() -> int:
     scl = _board_pin(SCL_BCM)
     sda = _board_pin(SDA_BCM)
     log.info(
-        "Opening SSD1306 soft-I2C SCL=BCM%s SDA=BCM%s addrs=%s ready=%s",
+        "Opening SSD1306 %sx%s soft-I2C SCL=BCM%s SDA=BCM%s addrs=%s",
+        WIDTH,
+        HEIGHT,
         SCL_BCM,
         SDA_BCM,
         [hex(a) for a in I2C_ADDRS],
-        READY_FLAG.exists(),
     )
 
     i2c = None
     display = None
     try:
+        # Software I2C on arbitrary GPIO (not hardware /dev/i2c-1).
         i2c = bitbangio.I2C(scl, sda)
         display = _open_display(i2c)
     except Exception:
@@ -230,41 +154,51 @@ def main() -> int:
         return 1
 
     font_path = _find_font_path()
+    if font_path:
+        log.info("Using font %s", font_path)
+    else:
+        log.warning("No TTF font found — using tiny default bitmap font")
+
     image = Image.new("1", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
     font = _largest_font(draw, "88:88", font_path, WIDTH - 4, HEIGHT - 4)
-    last_key = None
-    log.info("OLED UI started")
+    last_text = ""
+
+    log.info("OLED clock started")
 
     try:
         while not stop:
-            try:
-                now = time.time()
-                status = _load_status()
-                mode = _resolve_mode(status, now)
-                clock_text = datetime.now().strftime("%H:%M")
-                key = (mode, clock_text if mode == "time" else "")
+            now = datetime.now()
+            text = now.strftime("%H:%M")
+            if text != last_text:
+                draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
+                bbox = draw.textbbox((0, 0), text, font=font)
+                tw = bbox[2] - bbox[0]
+                th = bbox[3] - bbox[1]
+                x = (WIDTH - tw) // 2 - bbox[0]
+                y = (HEIGHT - th) // 2 - bbox[1]
+                draw.text((x, y), text, font=font, fill=255)
+                display.image(image)
+                display.show()
+                last_text = text
 
-                if key != last_key:
-                    _paint(display, image, draw, font, mode, clock_text)
-                    log.info("OLED mode → %s", mode)
-                    last_key = key
-            except Exception:
-                log.error("OLED frame failed:\n%s", traceback.format_exc())
-                last_key = None
-                time.sleep(1.0)
-                continue
-
-            time.sleep(max(0.15, POLL_SEC))
+            time.sleep(max(0.2, POLL_SEC))
+    except Exception:
+        log.error("OLED loop crashed:\n%s", traceback.format_exc())
+        return 1
     finally:
-        # Do not blank the panel on restart — avoids a permanently black screen
-        # if the next start fails mid-init.
+        try:
+            if display is not None:
+                display.fill(0)
+                display.show()
+        except Exception:
+            pass
         try:
             if i2c is not None:
                 i2c.deinit()
         except Exception:
             pass
-        log.info("OLED UI stopped")
+        log.info("OLED clock stopped")
 
     return 0
 

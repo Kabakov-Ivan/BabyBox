@@ -15,7 +15,6 @@ restore_ap() {
   ip addr add 192.168.4.1/24 dev wlan0 || true
   ip link set wlan0 up || true
   systemctl start hostapd dnsmasq || true
-  rm -f /tmp/babybox-oled-ready || true
 }
 
 systemctl stop hostapd dnsmasq || true
@@ -57,5 +56,4 @@ if [ "$RC" -ne 0 ]; then
   exit 1
 fi
 
-touch /tmp/babybox-oled-ready || true
 logger -t babybox-wifi "connected to ${SSID}"
