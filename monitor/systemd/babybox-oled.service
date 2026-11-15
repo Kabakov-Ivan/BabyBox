@@ -1,7 +1,9 @@
 [Unit]
 Description=BabyBox OLED clock (SSD1306)
-After=multi-user.target
-Wants=time-sync.target
+# Start as soon as the root FS is ready. Do NOT wait for multi-user /
+# network: multi-user is blocked by babybox-boot-wifi (oneshot), and that
+# was delaying the first OLED frame by a long time on Pi 3.
+After=local-fs.target
 
 [Service]
 Type=simple

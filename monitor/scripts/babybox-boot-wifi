@@ -1,5 +1,6 @@
 #!/bin/bash
 # On boot: always start BABY_BOX_SETUP access point.
+# Keep this fast — OLED and the phone both wait on AP / first screen.
 set -euo pipefail
 
 AP_SSID="BABY_BOX_SETUP"
@@ -9,14 +10,27 @@ AP_IP="192.168.4.1"
 rm -f /tmp/babybox-oled-ready || true
 
 logger -t babybox-boot-wifi "waiting for NetworkManager"
-for _ in $(seq 1 30); do
-  if systemctl is-active --quiet NetworkManager; then
+# After=NetworkManager.service already ordered us; only a short readiness
+# poll so nmcli works. Do not burn 30s here on Pi 3.
+for _ in $(seq 1 10); do
+  if systemctl is-active --quiet NetworkManager \
+    && nmcli -t general status >/dev/null 2>&1; then
     break
   fi
-  sleep 1
+  sleep 0.5
 done
 
 logger -t babybox-boot-wifi "starting AP ${AP_SSID}"
+
+# Design: every boot raises setup AP. Disable client autoconnect so NM does
+# not spend boot time joining a saved home Wi-Fi before we take the radio.
+while IFS=: read -r name type; do
+  case "${type}" in
+    *wireless*|*wifi*|802-11-wireless)
+      nmcli connection modify "$name" connection.autoconnect no 2>/dev/null || true
+      ;;
+  esac
+done < <(nmcli -t -f NAME,TYPE connection show 2>/dev/null || true)
 
 # Drop any client Wi-Fi so the radio is free for AP.
 nmcli radio wifi on || true
@@ -31,6 +45,7 @@ ip addr flush dev wlan0 || true
 ip addr add "${AP_IP}/24" dev wlan0
 ip link set wlan0 up
 
+# hostapd first → SSID appears ASAP; dnsmasq right after for DHCP.
 systemctl start hostapd
 systemctl start dnsmasq
 

@@ -36,14 +36,16 @@ done < <(nmcli -t -f NAME connection show)
 
 nmcli connection delete "$CON_NAME" 2>/dev/null || true
 
+# autoconnect=no: every reboot must raise setup AP (babybox-boot-wifi).
+# If autoconnect=yes, NM races the AP on boot and can add ~30–90s delay.
 set +e
 if [ -n "$PASS" ]; then
   nmcli connection add type wifi ifname wlan0 con-name "$CON_NAME" ssid "$SSID" \
-    connection.autoconnect yes \
+    connection.autoconnect no \
     wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASS"
 else
   nmcli connection add type wifi ifname wlan0 con-name "$CON_NAME" ssid "$SSID" \
-    connection.autoconnect yes
+    connection.autoconnect no
 fi
 nmcli --wait 30 connection up "$CON_NAME"
 RC=$?

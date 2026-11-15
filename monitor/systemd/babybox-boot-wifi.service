@@ -1,12 +1,16 @@
 [Unit]
 Description=BabyBox Wi-Fi mode (AP if no home network)
+# Bring up setup AP as soon as NetworkManager is up — do not wait for
+# network-online (that can sit for a long time on Pi 3).
 After=NetworkManager.service
 Wants=NetworkManager.service
+Before=babybox-web.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/babybox-boot-wifi
 RemainAfterExit=yes
+TimeoutStartSec=60
 
 [Install]
 WantedBy=multi-user.target
