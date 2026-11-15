@@ -10,6 +10,7 @@ from camera_stream import BOUNDARY, camera
 from dht_sensor import dht
 from media_store import media_store
 from nightlight import nightlight
+import oled_status
 import settings_store
 from sensor_history import day_report
 
@@ -309,10 +310,14 @@ def api_control():
                 light=nightlight.is_on(),
                 **status,
             ), 500
+        # Manual ON from the main panel → lamp icon for a few seconds.
+        if nightlight.is_on():
+            oled_status.flash_lamp()
         return jsonify(ok=True, action="light", enabled=nightlight.is_on(), **status)
 
     if action == "lullaby":
-        # Sound is handled in the browser for now.
+        # Sound plays in the browser; OLED shows the music icon while enabled.
+        oled_status.set_lullaby(enabled)
         return jsonify(ok=True, action="lullaby", enabled=enabled)
 
     return jsonify(error=f"Unknown action: {action}"), 400

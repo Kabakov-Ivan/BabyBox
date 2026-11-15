@@ -1,4 +1,4 @@
-"""OLED clock on SSD1306 128x64 (soft / bitbang I2C).
+"""OLED UI on SSD1306 128x64 (soft / bitbang I2C).
 
 Wiring (physical pins → BCM):
   GND → pin 9
@@ -6,9 +6,11 @@ Wiring (physical pins → BCM):
   SDA → pin 15 (BCM GPIO22)
   SCK → pin 16 (BCM GPIO23)
 
-Must use adafruit_bitbangio — Blinka bitbangio is stubbed on Linux, and
-busio.I2C only talks to /dev/i2c-* (hardware I2C1 pins 3/5 stay free
-for the power button on BCM GPIO3).
+Screens (priority):
+  1) lamp   — night light toggled ON from panel (3s), then fallback
+  2) music  — lullaby playing
+  3) wifi   — setup AP is up (hostapd)
+  4) time   — default HH:MM
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import subprocess
 import sys
 import time
 import traceback
@@ -30,7 +33,6 @@ log = logging.getLogger("oled_clock")
 
 SCL_BCM = int(os.environ.get("OLED_SCL_BCM", "23"))
 SDA_BCM = int(os.environ.get("OLED_SDA_BCM", "22"))
-# Comma-separated list; first successful address wins.
 I2C_ADDRS = [
     int(x.strip(), 0)
     for x in os.environ.get("OLED_I2C_ADDR", "0x3C,0x3D").split(",")
@@ -38,7 +40,7 @@ I2C_ADDRS = [
 ]
 WIDTH = int(os.environ.get("OLED_WIDTH", "128"))
 HEIGHT = int(os.environ.get("OLED_HEIGHT", "64"))
-POLL_SEC = float(os.environ.get("OLED_POLL_SEC", "1.0"))
+POLL_SEC = float(os.environ.get("OLED_POLL_SEC", "0.25"))
 
 FONT_CANDIDATES = [
     Path(os.environ["OLED_FONT"]) if os.environ.get("OLED_FONT") else None,
@@ -104,6 +106,78 @@ def _open_display(i2c):
     raise RuntimeError(f"SSD1306 not found on {I2C_ADDRS}: {last_exc}")
 
 
+def _hostapd_active() -> bool:
+    try:
+        return (
+            subprocess.run(
+                ["systemctl", "is-active", "--quiet", "hostapd"],
+                check=False,
+                timeout=1.0,
+            ).returncode
+            == 0
+        )
+    except Exception:
+        return False
+
+
+def _resolve_mode(status: dict, now: float) -> str:
+    if float(status.get("lamp_until") or 0) > now:
+        return "lamp"
+    if status.get("lullaby"):
+        return "music"
+    if _hostapd_active():
+        return "wifi"
+    return "time"
+
+
+def _draw_wifi(draw) -> None:
+    cx, cy = WIDTH // 2, HEIGHT // 2 + 6
+    for r in (14, 24, 34):
+        bbox = [cx - r, cy - r, cx + r, cy + r]
+        draw.arc(bbox, start=220, end=320, fill=255, width=3)
+    draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=255)
+
+
+def _draw_music(draw) -> None:
+    # Note head + stem + flag, centered.
+    hx, hy = WIDTH // 2 - 10, HEIGHT // 2 + 14
+    draw.ellipse([hx - 12, hy - 9, hx + 12, hy + 9], fill=255)
+    stem_x = hx + 10
+    draw.rectangle([stem_x, hy - 34, stem_x + 5, hy], fill=255)
+    # Flag
+    draw.polygon(
+        [
+            (stem_x + 5, hy - 34),
+            (stem_x + 28, hy - 26),
+            (stem_x + 28, hy - 18),
+            (stem_x + 5, hy - 24),
+        ],
+        fill=255,
+    )
+
+
+def _draw_lamp(draw) -> None:
+    cx, cy = WIDTH // 2, HEIGHT // 2 - 4
+    # Bulb
+    draw.ellipse([cx - 18, cy - 18, cx + 18, cy + 18], fill=255)
+    # Neck / base (black cut then white base)
+    draw.rectangle([cx - 10, cy + 12, cx + 10, cy + 22], fill=0)
+    draw.rectangle([cx - 8, cy + 14, cx + 8, cy + 26], fill=255)
+    draw.rectangle([cx - 12, cy + 26, cx + 12, cy + 30], fill=255)
+    # Filament lines (cut out)
+    draw.line([cx - 6, cy - 4, cx + 6, cy - 4], fill=0, width=2)
+    draw.line([cx, cy - 10, cx, cy + 4], fill=0, width=2)
+
+
+def _draw_time(draw, font, text: str) -> None:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+    x = (WIDTH - tw) // 2 - bbox[0]
+    y = (HEIGHT - th) // 2 - bbox[1]
+    draw.text((x, y), text, font=font, fill=255)
+
+
 def main() -> int:
     try:
         import adafruit_bitbangio as bitbangio
@@ -117,6 +191,12 @@ def main() -> int:
             exc,
         )
         return 1
+
+    try:
+        from oled_status import load as load_status
+    except ImportError:
+        def load_status():  # type: ignore
+            return {"lullaby": False, "lamp_until": 0}
 
     stop = False
 
@@ -141,7 +221,6 @@ def main() -> int:
     i2c = None
     display = None
     try:
-        # Software I2C on arbitrary GPIO (not hardware /dev/i2c-1).
         i2c = bitbangio.I2C(scl, sda)
         display = _open_display(i2c)
     except Exception:
@@ -162,27 +241,35 @@ def main() -> int:
     image = Image.new("1", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
     font = _largest_font(draw, "88:88", font_path, WIDTH - 4, HEIGHT - 4)
-    last_text = ""
+    last_key = None
 
-    log.info("OLED clock started")
+    log.info("OLED UI started")
 
     try:
         while not stop:
-            now = datetime.now()
-            text = now.strftime("%H:%M")
-            if text != last_text:
+            now = time.time()
+            status = load_status()
+            mode = _resolve_mode(status, now)
+            clock_text = datetime.now().strftime("%H:%M")
+            key = (mode, clock_text if mode == "time" else "")
+
+            if key != last_key:
                 draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
-                bbox = draw.textbbox((0, 0), text, font=font)
-                tw = bbox[2] - bbox[0]
-                th = bbox[3] - bbox[1]
-                x = (WIDTH - tw) // 2 - bbox[0]
-                y = (HEIGHT - th) // 2 - bbox[1]
-                draw.text((x, y), text, font=font, fill=255)
+                if mode == "wifi":
+                    _draw_wifi(draw)
+                elif mode == "music":
+                    _draw_music(draw)
+                elif mode == "lamp":
+                    _draw_lamp(draw)
+                else:
+                    _draw_time(draw, font, clock_text)
                 display.image(image)
                 display.show()
-                last_text = text
+                if last_key is None or (last_key and last_key[0] != mode):
+                    log.info("OLED mode → %s", mode)
+                last_key = key
 
-            time.sleep(max(0.2, POLL_SEC))
+            time.sleep(max(0.15, POLL_SEC))
     except Exception:
         log.error("OLED loop crashed:\n%s", traceback.format_exc())
         return 1
@@ -198,7 +285,7 @@ def main() -> int:
                 i2c.deinit()
         except Exception:
             pass
-        log.info("OLED clock stopped")
+        log.info("OLED UI stopped")
 
     return 0
 
