@@ -13,6 +13,17 @@ from nightlight import nightlight
 import settings_store
 from sensor_history import day_report
 
+
+def _oled_safe(fn_name: str, *args, **kwargs) -> None:
+    """OLED overlays must never break the web panel."""
+    try:
+        import oled_status
+
+        getattr(oled_status, fn_name)(*args, **kwargs)
+    except Exception:
+        pass
+
+
 # Night light must never block Wi-Fi setup / the web panel.
 try:
     nightlight.set(False, source="auto")
@@ -312,10 +323,13 @@ def api_control():
                 light=nightlight.is_on(),
                 **status,
             ), 500
+        if nightlight.is_on():
+            _oled_safe("flash_lamp")
         return jsonify(ok=True, action="light", enabled=nightlight.is_on(), **status)
 
     if action == "lullaby":
-        # Sound is handled in the browser for now.
+        # Sound plays in the browser; OLED shows music icon while enabled.
+        _oled_safe("set_lullaby", enabled)
         return jsonify(ok=True, action="lullaby", enabled=enabled)
 
     return jsonify(error=f"Unknown action: {action}"), 400
