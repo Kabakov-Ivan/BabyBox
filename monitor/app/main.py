@@ -13,9 +13,12 @@ from nightlight import nightlight
 import settings_store
 from sensor_history import day_report
 
-# Start with LED off, then follow light-sensor auto mode if enabled on disk.
-nightlight.set(False, source="auto")
-nightlight.start_auto_loop()
+# Night light must never block Wi-Fi setup / the web panel.
+try:
+    nightlight.set(False, source="auto")
+    nightlight.start_auto_loop()
+except Exception:
+    pass
 
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
 
