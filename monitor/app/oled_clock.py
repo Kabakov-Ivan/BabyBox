@@ -127,23 +127,33 @@ def _resolve_mode(status: dict, now: float) -> str:
 
 
 def _draw_wifi(draw) -> None:
-    cx, cy = WIDTH // 2, HEIGHT // 2 + 8
-    for r in (16, 17, 24, 25, 32, 33):
-        draw.arc([cx - r, cy - r, cx + r, cy + r], start=220, end=320, fill=255)
-    draw.ellipse([cx - 4, cy - 4, cx + 4, cy + 4], fill=255)
+    """Wi-Fi arcs centered on 128x64 (no empty strip at the bottom)."""
+    # Dot sits lower; arcs open upward. Whole glyph optical center ≈ (64, 32).
+    cx, cy = WIDTH // 2, HEIGHT // 2 + 10
+    for r in (10, 18, 26):
+        for t in (0, 1):  # double stroke = thicker arcs
+            rr = r + t
+            draw.arc([cx - rr, cy - rr, cx + rr, cy + rr], start=220, end=320, fill=255)
+    draw.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=255)
 
 
 def _draw_music(draw) -> None:
-    hx, hy = WIDTH // 2 - 8, HEIGHT // 2 + 12
-    draw.ellipse([hx - 10, hy - 8, hx + 10, hy + 8], fill=255)
-    stem_x = hx + 8
-    draw.rectangle([stem_x, hy - 32, stem_x + 4, hy], fill=255)
+    """Eighth note, optically centered on the screen."""
+    # Bounding box roughly x=40..88, y=8..56 → center (64, 32).
+    hx, hy = WIDTH // 2 - 4, HEIGHT // 2 + 14
+    # Head
+    draw.ellipse([hx - 12, hy - 8, hx + 12, hy + 8], fill=255)
+    # Stem
+    stem_x = hx + 10
+    stem_top = HEIGHT // 2 - 22
+    draw.rectangle([stem_x, stem_top, stem_x + 4, hy - 2], fill=255)
+    # Flag
     draw.polygon(
         [
-            (stem_x + 4, hy - 32),
-            (stem_x + 24, hy - 24),
-            (stem_x + 24, hy - 16),
-            (stem_x + 4, hy - 22),
+            (stem_x + 4, stem_top),
+            (stem_x + 24, stem_top + 8),
+            (stem_x + 24, stem_top + 16),
+            (stem_x + 4, stem_top + 10),
         ],
         fill=255,
     )
