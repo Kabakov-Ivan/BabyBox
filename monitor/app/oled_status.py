@@ -1,8 +1,7 @@
-"""Shared OLED UI state for BabyBox (/tmp/babybox-oled.json).
+"""OLED status file: /tmp/babybox-oled.json
 
-phase:
-  setup — boot / AP / waiting for home Wi-Fi  → Wi-Fi icon
-  ready — home Wi-Fi connected                 → clock
+Only stores panel events (lullaby / lamp flash).
+Wi-Fi vs time is a simple ready-flag file (see READY_FLAG).
 """
 
 from __future__ import annotations
@@ -14,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 STATUS_FILE = Path(os.environ.get("OLED_STATUS_FILE", "/tmp/babybox-oled.json"))
+# Exists → show clock. Missing → show Wi-Fi icon.
+READY_FLAG = Path(os.environ.get("OLED_READY_FLAG", "/tmp/babybox-oled-ready"))
 LAMP_SEC = float(os.environ.get("OLED_LAMP_SEC", "3"))
 
 
@@ -35,30 +36,34 @@ def _write(payload: dict[str, Any]) -> None:
 
 def load() -> dict[str, Any]:
     data = _read()
-    phase = str(data.get("phase") or "setup").strip().lower()
-    if phase not in {"setup", "ready"}:
-        phase = "setup"
     return {
-        "phase": phase,
+        "ready": READY_FLAG.exists(),
         "lullaby": bool(data.get("lullaby")),
         "lamp_until": float(data.get("lamp_until") or 0),
         "updated_at": data.get("updated_at"),
     }
 
 
-def set_phase(phase: str) -> dict[str, Any]:
-    phase = "ready" if str(phase).strip().lower() == "ready" else "setup"
-    data = _read()
-    data["phase"] = phase
-    _write(data)
-    return load()
+def mark_setup() -> None:
+    """Boot / AP mode → Wi-Fi icon."""
+    try:
+        READY_FLAG.unlink(missing_ok=True)
+    except TypeError:
+        # Python <3.8 style (shouldn't happen on Pi 3.13)
+        if READY_FLAG.exists():
+            READY_FLAG.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def mark_ready() -> None:
+    """Home Wi-Fi connected → clock."""
+    READY_FLAG.write_text("1\n", encoding="utf-8")
 
 
 def set_lullaby(enabled: bool) -> dict[str, Any]:
     data = _read()
     data["lullaby"] = bool(enabled)
-    if "phase" not in data:
-        data["phase"] = "setup"
     _write(data)
     return load()
 
@@ -66,7 +71,5 @@ def set_lullaby(enabled: bool) -> dict[str, Any]:
 def flash_lamp(seconds: float | None = None) -> dict[str, Any]:
     data = _read()
     data["lamp_until"] = time.time() + float(LAMP_SEC if seconds is None else seconds)
-    if "phase" not in data:
-        data["phase"] = "setup"
     _write(data)
     return load()

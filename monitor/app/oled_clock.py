@@ -6,11 +6,10 @@ Wiring (physical pins → BCM):
   SDA → pin 15 (BCM GPIO22)
   SCK → pin 16 (BCM GPIO23)
 
-Screens (priority):
-  1) lamp   — night light toggled ON from panel (3s), then fallback
-  2) music  — lullaby playing
-  3) time   — only after home Wi-Fi connect (phase=ready)
-  4) wifi   — default from boot (phase=setup / no status file yet)
+Same service as before. Difference:
+  boot → Wi-Fi icon (instead of time)
+  after home Wi-Fi → time
+  + lamp / music overlays from the panel
 """
 
 from __future__ import annotations
@@ -110,8 +109,8 @@ def _resolve_mode(status: dict, now: float) -> str:
         return "lamp"
     if status.get("lullaby"):
         return "music"
-    # Boot → wifi. Time only after babybox-wifi sets phase=ready.
-    if status.get("phase") == "ready":
+    # No ready-flag → Wi-Fi icon. Flag appears after home Wi-Fi connect.
+    if status.get("ready"):
         return "time"
     return "wifi"
 
@@ -201,13 +200,10 @@ def main() -> int:
         return 1
 
     try:
-        from oled_status import STATUS_FILE, load as load_status, set_phase
-        # No status yet (cold boot) → Wi-Fi mode until home Wi-Fi connects.
-        if not STATUS_FILE.exists():
-            set_phase("setup")
+        from oled_status import load as load_status
     except ImportError:
         def load_status():  # type: ignore
-            return {"phase": "setup", "lullaby": False, "lamp_until": 0}
+            return {"ready": False, "lullaby": False, "lamp_until": 0}
 
     stop = False
 
@@ -253,17 +249,24 @@ def main() -> int:
     draw = ImageDraw.Draw(image)
     font = _largest_font(draw, "88:88", font_path, WIDTH - 4, HEIGHT - 4)
 
-    # Default screen from boot: Wi-Fi (until home network is up).
+    # First frame: Wi-Fi icon (or time if home Wi-Fi already connected).
+    last_key = None
     try:
+        status = load_status()
+        mode = _resolve_mode(status, time.time())
+        clock_text = datetime.now().strftime("%H:%M")
         draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
-        _draw_wifi(draw)
+        if mode == "time":
+            _draw_time(draw, font, clock_text)
+        else:
+            _draw_wifi(draw)
+            mode = "wifi"
         display.image(image)
         display.show()
-        last_key = ("wifi", "")
-        log.info("OLED UI started (wifi)")
+        last_key = (mode, clock_text if mode == "time" else "")
+        log.info("OLED UI started (%s)", mode)
     except Exception:
-        log.warning("Initial Wi-Fi frame failed:\n%s", traceback.format_exc())
-        last_key = None
+        log.warning("Initial frame failed:\n%s", traceback.format_exc())
         log.info("OLED UI started")
 
     try:
