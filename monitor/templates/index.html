@@ -420,7 +420,15 @@
           <b id="mediaViewerTitle">Просмотр</b>
           <small id="mediaViewerMeta"></small>
         </div>
-        <button class="media-viewer-close" id="mediaViewerClose" type="button" aria-label="Закрыть">×</button>
+        <div class="media-viewer-actions">
+          <button class="media-icon-btn download" id="mediaViewerDownload" type="button" aria-label="Скачать" title="Скачать">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg>
+          </button>
+          <button class="media-icon-btn danger" id="mediaViewerDelete" type="button" aria-label="Удалить" title="Удалить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/></svg>
+          </button>
+          <button class="media-viewer-close" id="mediaViewerClose" type="button" aria-label="Закрыть">×</button>
+        </div>
       </div>
       <div class="media-viewer-stage" id="mediaViewerStage"></div>
     </div>
@@ -430,6 +438,6 @@
   <section class="lock-screen" id="lockScreen" role="dialog" aria-modal="true" aria-labelledby="lockTitle" hidden>
     <div class="lock-card panel"><span class="lock-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></svg></span><h1 id="lockTitle">Панель заблокирована</h1><p>Введите PIN-код, чтобы продолжить.</p><form id="unlockForm"><label class="visually-hidden" for="unlockPin">PIN-код</label><input id="unlockPin" type="password" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4,8}" maxlength="8" required><div class="pin-pad" aria-label="Цифровая клавиатура"><button type="button" data-pin-digit="1">1</button><button type="button" data-pin-digit="2">2</button><button type="button" data-pin-digit="3">3</button><button type="button" data-pin-digit="4">4</button><button type="button" data-pin-digit="5">5</button><button type="button" data-pin-digit="6">6</button><button type="button" data-pin-digit="7">7</button><button type="button" data-pin-digit="8">8</button><button type="button" data-pin-digit="9">9</button><button type="button" data-pin-action="clear">Очистить</button><button type="button" data-pin-digit="0">0</button><button type="button" data-pin-action="backspace" aria-label="Удалить последнюю цифру">⌫</button></div><button class="button button-primary" type="submit">Разблокировать</button></form><small id="unlockStatus" role="status"></small></div>
   </section>
-  <script src="../static/script.js?v=oled-icons-2"></script>
+  <script src="../static/script.js?v=media-actions-1"></script>
 </body>
 </html>

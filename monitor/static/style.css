@@ -1035,17 +1035,43 @@ h1, h2, h3, p { margin-top: 0; }
   justify-content: flex-end;
   gap: 8px;
 }
-.recording-actions .text-button {
-  color: #c2c8d0;
-  font-size: 13px;
-  font-weight: 600;
-  background: none;
+.media-icon-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
   border: 0;
-  padding: 0;
+  border-radius: 10px;
   cursor: pointer;
+  transition: background .18s, transform .15s, opacity .18s;
 }
-.recording-actions .text-button.danger { color: #ff8fa3; }
-.recording-actions .text-button:hover { opacity: .85; }
+.media-icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.media-icon-btn.download {
+  background: #15382f;
+  color: #7fe5be;
+}
+.media-icon-btn.download:hover {
+  background: #1c4a3c;
+}
+.media-icon-btn.danger {
+  background: #4a1822;
+  color: #ff8fa3;
+}
+.media-icon-btn.danger:hover {
+  background: #5c1f2b;
+}
+.media-icon-btn:active {
+  transform: translateY(1px);
+}
 
 .media-viewer {
   position: fixed;
@@ -1098,12 +1124,18 @@ h1, h2, h3, p { margin-top: 0; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.media-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
 .media-viewer-close {
   width: 36px;
   height: 36px;
   flex: 0 0 auto;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--panel-soft);
   color: var(--text);
   font-size: 24px;
@@ -1499,8 +1531,14 @@ body[data-theme="light"] .connect-dialog select { background: #fff; color: var(-
 body[data-theme="light"] .device-card,
 body[data-theme="light"] .recording-item { border-color: var(--border); }
 body[data-theme="light"] .recording-preview-wrap { border-color: var(--border); background: #e8ecf1; }
-body[data-theme="light"] .recording-actions .text-button { color: #445066; }
-body[data-theme="light"] .recording-actions .text-button.danger { color: #c43b55; }
+body[data-theme="light"] .media-icon-btn.download {
+  background: #daf5ea;
+  color: #1f8a62;
+}
+body[data-theme="light"] .media-icon-btn.danger {
+  background: #f8dce2;
+  color: #c43b55;
+}
 body[data-theme="light"] .sensor-name,
 body[data-theme="light"] .control-tile b,
 body[data-theme="light"] .heading-title h2 { color: #273750; }

@@ -518,6 +518,49 @@ function emptyMediaState() {
   return empty;
 }
 
+let currentMediaItem = null;
+
+function mediaActionIcon(kind) {
+  if (kind === 'download') {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0 4-4m-4 4-4-4M5 19h14"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/></svg>';
+}
+
+function createMediaActionButton(kind, label, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `media-icon-btn ${kind === 'download' ? 'download' : 'danger'}`;
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.innerHTML = mediaActionIcon(kind);
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    onClick();
+  });
+  return button;
+}
+
+async function downloadMediaItem(item) {
+  if (!item?.url) return;
+  try {
+    const response = await fetch(item.url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = item.name || (item.kind === 'photo' ? 'babybox-photo.jpg' : 'babybox-video.mp4');
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+    showToast('Файл скачивается на устройство');
+  } catch (error) {
+    showToast(error.message || 'Не удалось скачать файл');
+  }
+}
+
 function closeMediaViewer() {
   const viewer = $('#mediaViewer');
   const stage = $('#mediaViewerStage');
@@ -531,6 +574,7 @@ function closeMediaViewer() {
   });
   stage.replaceChildren();
   viewer.hidden = true;
+  currentMediaItem = null;
   document.body.classList.remove('media-viewer-open');
 }
 
@@ -540,6 +584,7 @@ function openMediaViewer(item) {
   if (!viewer || !stage) return;
 
   closeMediaViewer();
+  currentMediaItem = item;
 
   const title = $('#mediaViewerTitle');
   const meta = $('#mediaViewerMeta');
@@ -572,6 +617,12 @@ function openMediaViewer(item) {
 
 $('#mediaViewerClose')?.addEventListener('click', closeMediaViewer);
 $('#mediaViewerBackdrop')?.addEventListener('click', closeMediaViewer);
+$('#mediaViewerDownload')?.addEventListener('click', () => {
+  if (currentMediaItem) downloadMediaItem(currentMediaItem);
+});
+$('#mediaViewerDelete')?.addEventListener('click', () => {
+  if (currentMediaItem?.name) deleteMediaItem(currentMediaItem.name);
+});
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !$('#mediaViewer')?.hidden) closeMediaViewer();
 });
@@ -617,15 +668,10 @@ function renderMediaItem(item) {
 
   const actions = document.createElement('div');
   actions.className = 'recording-actions';
-  const remove = document.createElement('button');
-  remove.className = 'text-button danger';
-  remove.type = 'button';
-  remove.textContent = 'Удалить';
-  remove.addEventListener('click', event => {
-    event.stopPropagation();
-    deleteMediaItem(item.name);
-  });
-  actions.append(remove);
+  actions.append(
+    createMediaActionButton('download', 'Скачать', () => downloadMediaItem(item)),
+    createMediaActionButton('delete', 'Удалить', () => deleteMediaItem(item.name)),
+  );
 
   const open = () => openMediaViewer(item);
   article.addEventListener('click', open);
