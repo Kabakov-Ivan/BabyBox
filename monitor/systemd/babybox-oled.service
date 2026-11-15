@@ -10,8 +10,8 @@ Group=admin
 SupplementaryGroups=gpio i2c
 WorkingDirectory=/home/admin/BabyBox/monitor/app
 Environment=PYTHONUNBUFFERED=1
-Environment=OLED_SCL_BCM=22
-Environment=OLED_SDA_BCM=23
+Environment=OLED_SCL_BCM=23
+Environment=OLED_SDA_BCM=22
 Environment=OLED_I2C_ADDR=0x3C,0x3D
 Environment=OLED_POLL_SEC=1
 ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/oled_clock.py

@@ -170,7 +170,7 @@ echo "  - service: sudo systemctl status babybox-power"
 echo "  - Hold ~0.8s → shutdown; press while halted → power on"
 echo
 echo "OLED SSD1306 notes:"
-echo "  - GND→pin 9, VDD→3.3V pin 17, SDA→pin 16 (BCM23), SCK→pin 15 (BCM22)"
+echo "  - GND→pin 9, VDD→3.3V pin 17, SDA→pin 15 (BCM22), SCK→pin 16 (BCM23)"
 echo "  - soft I2C (hardware I2C1 pins 3/5 stay free for power button)"
 echo "  - service: sudo systemctl status babybox-oled"
 echo "  - shows large HH:MM fullscreen on boot"

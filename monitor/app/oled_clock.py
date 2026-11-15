@@ -3,8 +3,8 @@
 Wiring (physical pins → BCM):
   GND → pin 9
   VDD → pin 17 (3.3V)
-  SDA → pin 16 (BCM GPIO23)
-  SCK → pin 15 (BCM GPIO22)
+  SDA → pin 15 (BCM GPIO22)
+  SCK → pin 16 (BCM GPIO23)
 
 Must use adafruit_bitbangio — Blinka bitbangio is stubbed on Linux, and
 busio.I2C only talks to /dev/i2c-* (hardware I2C1 pins 3/5 stay free
@@ -28,8 +28,8 @@ logging.basicConfig(
 )
 log = logging.getLogger("oled_clock")
 
-SCL_BCM = int(os.environ.get("OLED_SCL_BCM", "22"))
-SDA_BCM = int(os.environ.get("OLED_SDA_BCM", "23"))
+SCL_BCM = int(os.environ.get("OLED_SCL_BCM", "23"))
+SDA_BCM = int(os.environ.get("OLED_SDA_BCM", "22"))
 # Comma-separated list; first successful address wins.
 I2C_ADDRS = [
     int(x.strip(), 0)
