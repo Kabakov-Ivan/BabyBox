@@ -656,6 +656,9 @@ function renderMediaItem(item) {
   playMark.textContent = '▶';
   previewWrap.append(preview, playMark);
 
+  const footer = document.createElement('div');
+  footer.className = 'recording-footer';
+
   const meta = document.createElement('div');
   meta.className = 'recording-meta';
   const title = document.createElement('b');
@@ -672,6 +675,7 @@ function renderMediaItem(item) {
     createMediaActionButton('download', 'Скачать', () => downloadMediaItem(item)),
     createMediaActionButton('delete', 'Удалить', () => deleteMediaItem(item.name)),
   );
+  footer.append(meta, actions);
 
   const open = () => openMediaViewer(item);
   article.addEventListener('click', open);
@@ -682,7 +686,7 @@ function renderMediaItem(item) {
     }
   });
 
-  article.append(previewWrap, meta, actions);
+  article.append(previewWrap, footer);
   return article;
 }
 
