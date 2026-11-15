@@ -30,13 +30,13 @@ if [ ! -x "${APP_DIR}/.venv/bin/python" ]; then
 fi
 
 apt-get update
-apt-get install -y hostapd dnsmasq python3-picamera2 libgpiod2 ffmpeg
+apt-get install -y hostapd dnsmasq python3-picamera2 libgpiod2 ffmpeg fonts-dejavu-core
 
-# Flask + DHT-11 libraries inside the app venv
+# Flask + DHT-11 / OLED libraries inside the app venv
 "${APP_DIR}/.venv/bin/pip" install -r "${APP_DIR}/requirements.txt"
 
 # CSI camera / GPIO access for the web service user
-usermod -aG video,gpio "$USER_NAME" 2>/dev/null || true
+usermod -aG video,gpio,i2c "$USER_NAME" 2>/dev/null || true
 
 # Photos / clips gallery + sensor history folders
 SAVE_DIR="$(getent passwd "$USER_NAME" | cut -d: -f6)/Save_BabyBox"
@@ -53,6 +53,8 @@ sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|
   "${ROOT}/systemd/babybox-web.service" > /etc/systemd/system/babybox-web.service
 sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
   "${ROOT}/systemd/babybox-dht.service" > /etc/systemd/system/babybox-dht.service
+sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
+  "${ROOT}/systemd/babybox-oled.service" > /etc/systemd/system/babybox-oled.service
 
 # hostapd / dnsmasq only started by boot script or restore_ap — not always-on
 systemctl disable --now hostapd 2>/dev/null || true
@@ -107,6 +109,7 @@ systemctl daemon-reload
 systemctl enable babybox-boot-wifi.service
 systemctl enable babybox-web.service
 systemctl enable babybox-dht.service
+systemctl enable babybox-oled.service
 
 echo
 echo "Installed. Reboot to test:"
@@ -165,3 +168,9 @@ echo "Power button notes:"
 echo "  - Button: GPIO3 (phys pin 5) ↔ GND (phys pin 20)"
 echo "  - service: sudo systemctl status babybox-power"
 echo "  - Hold ~0.8s → shutdown; press while halted → power on"
+echo
+echo "OLED SSD1306 notes:"
+echo "  - GND→pin 9, VDD→3.3V pin 17, SDA→pin 16 (BCM23), SCK→pin 15 (BCM22)"
+echo "  - soft I2C (hardware I2C1 pins 3/5 stay free for power button)"
+echo "  - service: sudo systemctl status babybox-oled"
+echo "  - shows large HH:MM fullscreen on boot"

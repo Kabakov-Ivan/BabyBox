@@ -1,0 +1,22 @@
+[Unit]
+Description=BabyBox OLED clock (SSD1306)
+After=multi-user.target
+Wants=time-sync.target
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+SupplementaryGroups=gpio i2c
+WorkingDirectory=/home/admin/BabyBox/monitor/app
+Environment=PYTHONUNBUFFERED=1
+Environment=OLED_SCL_BCM=22
+Environment=OLED_SDA_BCM=23
+Environment=OLED_I2C_ADDR=0x3C
+Environment=OLED_POLL_SEC=1
+ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/oled_clock.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
