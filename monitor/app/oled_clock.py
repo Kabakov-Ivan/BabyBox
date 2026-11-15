@@ -157,16 +157,38 @@ def _draw_music(draw) -> None:
 
 
 def _draw_lamp(draw) -> None:
-    cx, cy = WIDTH // 2, HEIGHT // 2 - 4
-    # Bulb
-    draw.ellipse([cx - 18, cy - 18, cx + 18, cy + 18], fill=255)
-    # Neck / base (black cut then white base)
-    draw.rectangle([cx - 10, cy + 12, cx + 10, cy + 22], fill=0)
-    draw.rectangle([cx - 8, cy + 14, cx + 8, cy + 26], fill=255)
-    draw.rectangle([cx - 12, cy + 26, cx + 12, cy + 30], fill=255)
-    # Filament lines (cut out)
-    draw.line([cx - 6, cy - 4, cx + 6, cy - 4], fill=0, width=2)
-    draw.line([cx, cy - 10, cx, cy + 4], fill=0, width=2)
+    """Classic outline lightbulb + rays (clean on 1-bit OLED)."""
+    cx, cy = WIDTH // 2, HEIGHT // 2 - 2
+    # Soft glow rays
+    rays = [
+        (cx, cy - 34, cx, cy - 26),
+        (cx - 24, cy - 24, cx - 17, cy - 17),
+        (cx + 24, cy - 24, cx + 17, cy - 17),
+        (cx - 30, cy - 6, cx - 22, cy - 6),
+        (cx + 30, cy - 6, cx + 22, cy - 6),
+    ]
+    for x1, y1, x2, y2 in rays:
+        draw.line([(x1, y1), (x2, y2)], fill=255, width=2)
+
+    # Bulb glass (outline)
+    draw.ellipse([cx - 16, cy - 20, cx + 16, cy + 12], outline=255, width=2)
+    # Inner highlight curve
+    draw.arc([cx - 10, cy - 14, cx + 2, cy], start=200, end=320, fill=255, width=1)
+
+    # Neck taper
+    draw.polygon(
+        [(cx - 8, cy + 10), (cx + 8, cy + 10), (cx + 6, cy + 16), (cx - 6, cy + 16)],
+        outline=255,
+    )
+    draw.line([(cx - 8, cy + 10), (cx + 8, cy + 10)], fill=255, width=1)
+    draw.line([(cx - 6, cy + 16), (cx + 6, cy + 16)], fill=255, width=1)
+
+    # Screw base
+    draw.rectangle([cx - 7, cy + 16, cx + 7, cy + 28], outline=255, width=2)
+    draw.line([(cx - 5, cy + 20), (cx + 5, cy + 20)], fill=255, width=1)
+    draw.line([(cx - 5, cy + 24), (cx + 5, cy + 24)], fill=255, width=1)
+    # Tip
+    draw.ellipse([cx - 4, cy + 27, cx + 4, cy + 33], fill=255)
 
 
 def _draw_time(draw, font, text: str) -> None:
