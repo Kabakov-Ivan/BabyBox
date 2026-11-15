@@ -6,8 +6,9 @@ Wiring (physical pins → BCM):
   SDA → pin 16 (BCM GPIO23)
   SCK → pin 15 (BCM GPIO22)
 
-Must use bitbangio — busio.I2C on Linux only talks to /dev/i2c-*
-(hardware I2C1 pins 3/5 stay free for the power button on BCM GPIO3).
+Must use adafruit_bitbangio — Blinka bitbangio is stubbed on Linux, and
+busio.I2C only talks to /dev/i2c-* (hardware I2C1 pins 3/5 stay free
+for the power button on BCM GPIO3).
 """
 
 from __future__ import annotations
@@ -105,12 +106,14 @@ def _open_display(i2c):
 
 def main() -> int:
     try:
-        import bitbangio
+        import adafruit_bitbangio as bitbangio
         import adafruit_ssd1306  # noqa: F401
         from PIL import Image, ImageDraw
     except ImportError as exc:
         log.error(
-            "Missing dependency: %s. Install: pip install adafruit-circuitpython-ssd1306 Pillow",
+            "Missing dependency: %s. "
+            "Install: pip install adafruit-circuitpython-ssd1306 "
+            "adafruit-circuitpython-bitbangio Pillow",
             exc,
         )
         return 1
@@ -138,7 +141,7 @@ def main() -> int:
     i2c = None
     display = None
     try:
-        # bitbangio = software I2C on arbitrary GPIO (not /dev/i2c-1).
+        # Software I2C on arbitrary GPIO (not hardware /dev/i2c-1).
         i2c = bitbangio.I2C(scl, sda)
         display = _open_display(i2c)
     except Exception:
