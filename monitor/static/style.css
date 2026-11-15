@@ -572,13 +572,14 @@ h1, h2, h3, p { margin-top: 0; }
   min-height: 44px;
   padding: 0 12px 0 6px;
   border: 1px solid rgb(255 255 255 / 9%);
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgb(9 18 31 / 88%);
 }
 .camera-audio .round-control {
   width: 36px;
   height: 36px;
   border: 0;
+  border-radius: 10px;
   background: transparent;
 }
 .camera-audio .round-control:hover:not(:disabled) { background: rgb(255 255 255 / 8%); }
@@ -605,7 +606,7 @@ h1, h2, h3, p { margin-top: 0; }
   display: grid;
   place-items: center;
   border: 1px solid rgb(255 255 255 / 9%);
-  border-radius: 50%;
+  border-radius: 12px;
   background: rgb(9 18 31 / 88%);
   color: #f1f5ff;
   font-size: 17px;

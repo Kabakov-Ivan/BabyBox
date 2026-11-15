@@ -332,14 +332,15 @@ async function setSitePalette(palette, { persist = true } = {}) {
 }
 
 async function loadSitePalette() {
-  applySitePalette(localStorage.getItem('radio-nanny-palette') || 'blue');
+  // Локально по умолчанию чёрная тема; на BabyBox берём сохранённую из /api/theme.
+  applySitePalette(localStorage.getItem('radio-nanny-palette') || 'graphite');
   try {
     const response = await fetch('/api/theme', { cache: 'no-store' });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Не удалось прочитать тему');
-    if (data.palette) applySitePalette(data.palette);
+    if (data.saved && data.palette) applySitePalette(data.palette);
   } catch {
-    // Локальный кэш уже применён — устройство может быть ещё без папки theme.
+    // Локальный кэш / graphite уже применён.
   }
 }
 

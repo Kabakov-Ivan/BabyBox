@@ -141,7 +141,7 @@ def api_theme():
             theme = settings_store.load_theme() or {}
         except OSError:
             return jsonify(saved=False, error="Нет доступа к папке темы на устройстве"), 503
-        palette = theme.get("palette") if theme.get("palette") in {"blue", "graphite"} else "blue"
+        palette = theme.get("palette") if theme.get("palette") in {"blue", "graphite"} else "graphite"
         return jsonify(saved=bool(theme), palette=palette, theme=theme)
 
     data = request.get_json(silent=True) or {}
