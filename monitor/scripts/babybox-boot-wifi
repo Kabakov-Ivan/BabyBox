@@ -4,6 +4,26 @@ set -euo pipefail
 
 AP_SSID="BABY_BOX_SETUP"
 AP_IP="192.168.4.1"
+OLED_STATUS="${OLED_STATUS_FILE:-/tmp/babybox-oled.json}"
+
+# OLED: Wi-Fi icon immediately (before waiting for NetworkManager / hostapd).
+python3 - "$OLED_STATUS" <<'PY'
+import json, sys, time
+from pathlib import Path
+path = Path(sys.argv[1])
+data = {}
+try:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict):
+        data = raw
+except Exception:
+    pass
+data["phase"] = "setup"
+data["updated_at"] = time.time()
+tmp = path.with_suffix(".tmp")
+tmp.write_text(json.dumps(data), encoding="utf-8")
+tmp.replace(path)
+PY
 
 logger -t babybox-boot-wifi "waiting for NetworkManager"
 for _ in $(seq 1 30); do

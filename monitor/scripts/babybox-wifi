@@ -8,6 +8,30 @@ SSID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["ssid"])' <<<"$IN
 PASS=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("password",""))' <<<"$INPUT")
 CON_NAME="babybox-${SSID}"
 
+OLED_STATUS="${OLED_STATUS_FILE:-/tmp/babybox-oled.json}"
+
+set_oled_phase() {
+  local phase="$1"
+  python3 - "$OLED_STATUS" "$phase" <<'PY'
+import json, sys, time
+from pathlib import Path
+path = Path(sys.argv[1])
+phase = sys.argv[2]
+data = {}
+try:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict):
+        data = raw
+except Exception:
+    pass
+data["phase"] = phase
+data["updated_at"] = time.time()
+tmp = path.with_suffix(".tmp")
+tmp.write_text(json.dumps(data), encoding="utf-8")
+tmp.replace(path)
+PY
+}
+
 restore_ap() {
   nmcli device set wlan0 managed no || true
   ip link set wlan0 down || true
@@ -15,6 +39,7 @@ restore_ap() {
   ip addr add 192.168.4.1/24 dev wlan0 || true
   ip link set wlan0 up || true
   systemctl start hostapd dnsmasq || true
+  set_oled_phase setup || true
 }
 
 systemctl stop hostapd dnsmasq || true
@@ -56,4 +81,5 @@ if [ "$RC" -ne 0 ]; then
   exit 1
 fi
 
+set_oled_phase ready || true
 logger -t babybox-wifi "connected to ${SSID}"

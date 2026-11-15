@@ -9,8 +9,8 @@ Wiring (physical pins → BCM):
 Screens (priority):
   1) lamp   — night light toggled ON from panel (3s), then fallback
   2) music  — lullaby playing
-  3) time   — only after home Wi-Fi (wlan0 IP, not 192.168.4.x)
-  4) wifi   — default from boot / setup AP / until home Wi-Fi is up
+  3) time   — only after home Wi-Fi connect (phase=ready)
+  4) wifi   — default from boot (phase=setup / no status file yet)
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from __future__ import annotations
 import logging
 import os
 import signal
-import subprocess
 import sys
 import time
 import traceback
@@ -106,50 +105,13 @@ def _open_display(i2c):
     raise RuntimeError(f"SSD1306 not found on {I2C_ADDRS}: {last_exc}")
 
 
-def _hostapd_active() -> bool:
-    try:
-        return (
-            subprocess.run(
-                ["systemctl", "is-active", "--quiet", "hostapd"],
-                check=False,
-                timeout=1.0,
-            ).returncode
-            == 0
-        )
-    except Exception:
-        return False
-
-
-def _home_wifi_ready() -> bool:
-    """True only after leaving setup AP and getting a real wlan0 address."""
-    if _hostapd_active():
-        return False
-    try:
-        out = subprocess.check_output(
-            ["ip", "-4", "-o", "addr", "show", "dev", "wlan0"],
-            text=True,
-            stderr=subprocess.DEVNULL,
-            timeout=1.0,
-        )
-    except Exception:
-        return False
-
-    for token in out.split():
-        if token.count(".") == 3 and "/" in token:
-            ip = token.split("/", 1)[0]
-            # Setup AP uses 192.168.4.1 — that is still "wifi" mode.
-            if ip and not ip.startswith("192.168.4."):
-                return True
-    return False
-
-
 def _resolve_mode(status: dict, now: float) -> str:
     if float(status.get("lamp_until") or 0) > now:
         return "lamp"
     if status.get("lullaby"):
         return "music"
-    # Boot / AP / connecting → wifi icon. Time only on home Wi-Fi.
-    if _home_wifi_ready():
+    # Boot → wifi. Time only after babybox-wifi sets phase=ready.
+    if status.get("phase") == "ready":
         return "time"
     return "wifi"
 
@@ -239,10 +201,13 @@ def main() -> int:
         return 1
 
     try:
-        from oled_status import load as load_status
+        from oled_status import STATUS_FILE, load as load_status, set_phase
+        # No status yet (cold boot) → Wi-Fi mode until home Wi-Fi connects.
+        if not STATUS_FILE.exists():
+            set_phase("setup")
     except ImportError:
         def load_status():  # type: ignore
-            return {"lullaby": False, "lamp_until": 0}
+            return {"phase": "setup", "lullaby": False, "lamp_until": 0}
 
     stop = False
 
@@ -288,13 +253,18 @@ def main() -> int:
     draw = ImageDraw.Draw(image)
     font = _largest_font(draw, "88:88", font_path, WIDTH - 4, HEIGHT - 4)
 
-    # Paint Wi-Fi immediately on boot — don't wait for hostapd/network checks.
-    draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
-    _draw_wifi(draw)
-    display.image(image)
-    display.show()
-    last_key = ("wifi", "")
-    log.info("OLED UI started (wifi)")
+    # Default screen from boot: Wi-Fi (until home network is up).
+    try:
+        draw.rectangle((0, 0, WIDTH, HEIGHT), outline=0, fill=0)
+        _draw_wifi(draw)
+        display.image(image)
+        display.show()
+        last_key = ("wifi", "")
+        log.info("OLED UI started (wifi)")
+    except Exception:
+        log.warning("Initial Wi-Fi frame failed:\n%s", traceback.format_exc())
+        last_key = None
+        log.info("OLED UI started")
 
     try:
         while not stop:

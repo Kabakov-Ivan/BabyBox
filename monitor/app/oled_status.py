@@ -1,7 +1,8 @@
 """Shared OLED UI state for BabyBox (/tmp/babybox-oled.json).
 
-Written by the web app (lullaby / night-light). Read by oled_clock.py.
-Network/AP mode is detected by the OLED worker itself (hostapd).
+phase:
+  setup — boot / AP / waiting for home Wi-Fi  → Wi-Fi icon
+  ready — home Wi-Fi connected                 → clock
 """
 
 from __future__ import annotations
@@ -34,16 +35,30 @@ def _write(payload: dict[str, Any]) -> None:
 
 def load() -> dict[str, Any]:
     data = _read()
+    phase = str(data.get("phase") or "setup").strip().lower()
+    if phase not in {"setup", "ready"}:
+        phase = "setup"
     return {
+        "phase": phase,
         "lullaby": bool(data.get("lullaby")),
         "lamp_until": float(data.get("lamp_until") or 0),
         "updated_at": data.get("updated_at"),
     }
 
 
+def set_phase(phase: str) -> dict[str, Any]:
+    phase = "ready" if str(phase).strip().lower() == "ready" else "setup"
+    data = _read()
+    data["phase"] = phase
+    _write(data)
+    return load()
+
+
 def set_lullaby(enabled: bool) -> dict[str, Any]:
     data = _read()
     data["lullaby"] = bool(enabled)
+    if "phase" not in data:
+        data["phase"] = "setup"
     _write(data)
     return load()
 
@@ -51,5 +66,7 @@ def set_lullaby(enabled: bool) -> dict[str, Any]:
 def flash_lamp(seconds: float | None = None) -> dict[str, Any]:
     data = _read()
     data["lamp_until"] = time.time() + float(LAMP_SEC if seconds is None else seconds)
+    if "phase" not in data:
+        data["phase"] = "setup"
     _write(data)
     return load()
