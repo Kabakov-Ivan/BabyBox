@@ -1,0 +1,11 @@
+---
+description: Never git commit or push — user handles GitHub alone
+alwaysApply: true
+---
+
+# Git: user owns remotes
+
+- NEVER run `git commit`, `git push`, `git pull` to publish, or create PRs unless Jacob explicitly asks in that message.
+- NEVER suggest that you will commit/push "for him".
+- After local code changes: just say what changed and give the Pi/shell commands he needs after he uploads himself.
+- He always uploads to GitHub himself.

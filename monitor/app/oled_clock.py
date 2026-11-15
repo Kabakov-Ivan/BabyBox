@@ -1,4 +1,4 @@
-"""OLED clock on SSD1306 128x64 (soft I2C).
+"""OLED clock on SSD1306 128x64 (soft / bitbang I2C).
 
 Wiring (physical pins → BCM):
   GND → pin 9
@@ -6,7 +6,8 @@ Wiring (physical pins → BCM):
   SDA → pin 16 (BCM GPIO23)
   SCK → pin 15 (BCM GPIO22)
 
-Hardware I2C1 (pins 3/5) is left free: pin 5 is the power button (BCM GPIO3).
+Must use bitbangio — busio.I2C on Linux only talks to /dev/i2c-*
+(hardware I2C1 pins 3/5 stay free for the power button on BCM GPIO3).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import os
 import signal
 import sys
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -27,7 +29,12 @@ log = logging.getLogger("oled_clock")
 
 SCL_BCM = int(os.environ.get("OLED_SCL_BCM", "22"))
 SDA_BCM = int(os.environ.get("OLED_SDA_BCM", "23"))
-I2C_ADDR = int(os.environ.get("OLED_I2C_ADDR", "0x3C"), 0)
+# Comma-separated list; first successful address wins.
+I2C_ADDRS = [
+    int(x.strip(), 0)
+    for x in os.environ.get("OLED_I2C_ADDR", "0x3C,0x3D").split(",")
+    if x.strip()
+]
 WIDTH = int(os.environ.get("OLED_WIDTH", "128"))
 HEIGHT = int(os.environ.get("OLED_HEIGHT", "64"))
 POLL_SEC = float(os.environ.get("OLED_POLL_SEC", "1.0"))
@@ -79,11 +86,27 @@ def _largest_font(draw, text: str, font_path: Path | None, max_w: int, max_h: in
     return best
 
 
+def _open_display(i2c):
+    import adafruit_ssd1306
+
+    last_exc: Exception | None = None
+    for addr in I2C_ADDRS:
+        try:
+            display = adafruit_ssd1306.SSD1306_I2C(WIDTH, HEIGHT, i2c, addr=addr)
+            display.fill(0)
+            display.show()
+            log.info("SSD1306 ready at 0x%02X", addr)
+            return display
+        except Exception as exc:
+            last_exc = exc
+            log.warning("SSD1306 not at 0x%02X: %s", addr, exc)
+    raise RuntimeError(f"SSD1306 not found on {I2C_ADDRS}: {last_exc}")
+
+
 def main() -> int:
     try:
-        import board  # noqa: F401
-        import busio
-        import adafruit_ssd1306
+        import bitbangio
+        import adafruit_ssd1306  # noqa: F401
         from PIL import Image, ImageDraw
     except ImportError as exc:
         log.error(
@@ -104,18 +127,28 @@ def main() -> int:
     scl = _board_pin(SCL_BCM)
     sda = _board_pin(SDA_BCM)
     log.info(
-        "Opening SSD1306 %sx%s addr=0x%02X soft-I2C SCL=BCM%s SDA=BCM%s",
+        "Opening SSD1306 %sx%s soft-I2C SCL=BCM%s SDA=BCM%s addrs=%s",
         WIDTH,
         HEIGHT,
-        I2C_ADDR,
         SCL_BCM,
         SDA_BCM,
+        [hex(a) for a in I2C_ADDRS],
     )
 
-    i2c = busio.I2C(scl, sda)
-    display = adafruit_ssd1306.SSD1306_I2C(WIDTH, HEIGHT, i2c, addr=I2C_ADDR)
-    display.fill(0)
-    display.show()
+    i2c = None
+    display = None
+    try:
+        # bitbangio = software I2C on arbitrary GPIO (not /dev/i2c-1).
+        i2c = bitbangio.I2C(scl, sda)
+        display = _open_display(i2c)
+    except Exception:
+        log.error("Failed to init OLED:\n%s", traceback.format_exc())
+        if i2c is not None:
+            try:
+                i2c.deinit()
+            except Exception:
+                pass
+        return 1
 
     font_path = _find_font_path()
     if font_path:
@@ -125,9 +158,7 @@ def main() -> int:
 
     image = Image.new("1", (WIDTH, HEIGHT))
     draw = ImageDraw.Draw(image)
-    # Probe font size with a wide time string so digits never clip.
-    probe = "88:88"
-    font = _largest_font(draw, probe, font_path, WIDTH - 4, HEIGHT - 4)
+    font = _largest_font(draw, "88:88", font_path, WIDTH - 4, HEIGHT - 4)
     last_text = ""
 
     log.info("OLED clock started")
@@ -149,14 +180,19 @@ def main() -> int:
                 last_text = text
 
             time.sleep(max(0.2, POLL_SEC))
+    except Exception:
+        log.error("OLED loop crashed:\n%s", traceback.format_exc())
+        return 1
     finally:
         try:
-            display.fill(0)
-            display.show()
+            if display is not None:
+                display.fill(0)
+                display.show()
         except Exception:
             pass
         try:
-            i2c.deinit()
+            if i2c is not None:
+                i2c.deinit()
         except Exception:
             pass
         log.info("OLED clock stopped")
