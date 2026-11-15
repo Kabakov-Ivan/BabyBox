@@ -27,9 +27,14 @@ def _read() -> dict[str, Any]:
 def _write(payload: dict[str, Any]) -> None:
     data = dict(payload)
     data["updated_at"] = time.time()
+    STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STATUS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=True), encoding="utf-8")
     tmp.replace(STATUS_FILE)
+    try:
+        os.chmod(STATUS_FILE, 0o666)
+    except OSError:
+        pass
 
 
 def load() -> dict[str, Any]:

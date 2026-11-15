@@ -1051,7 +1051,7 @@ $$('.control-tile:not(:disabled)').forEach(button => {
       if (!enabling) {
         audio?.pause();
         setControlState(button, false);
-        sendCommand('lullaby', false);
+        await sendCommand('lullaby', false);
         addEvent('Колыбельная: выключено', 'Воспроизведение остановлено на этом устройстве');
         return;
       }
@@ -1068,7 +1068,7 @@ $$('.control-tile:not(:disabled)').forEach(button => {
         catch { showToast('Звуковое воспроизведение недоступно в этом браузере.'); return; }
       }
       setControlState(button, true);
-      sendCommand('lullaby', true);
+      await sendCommand('lullaby', true);
       addEvent('Колыбельная: играет', 'Воспроизведение на этом устройстве', 'green');
       return;
     }
@@ -1323,7 +1323,7 @@ lullabyAudio?.addEventListener('ended', () => {
   stopPreview();
   const button = $('.control-tile[data-action="lullaby"]');
   if (button) setControlState(button, false);
-  sendCommand('lullaby', false);
+  void sendCommand('lullaby', false);
 });
 
 function setSecurityNotifications(enabled) {

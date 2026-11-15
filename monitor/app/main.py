@@ -323,14 +323,14 @@ def api_control():
                 light=nightlight.is_on(),
                 **status,
             ), 500
-        if nightlight.is_on():
+        if enabled and nightlight.is_on():
             _oled_safe("flash_lamp")
         return jsonify(ok=True, action="light", enabled=nightlight.is_on(), **status)
 
     if action == "lullaby":
         # Sound plays in the browser; OLED shows music icon while enabled.
         _oled_safe("set_lullaby", enabled)
-        return jsonify(ok=True, action="lullaby", enabled=enabled)
+        return jsonify(ok=True, action="lullaby", enabled=bool(enabled))
 
     return jsonify(error=f"Unknown action: {action}"), 400
 
