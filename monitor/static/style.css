@@ -1027,7 +1027,7 @@ h1, h2, h3, p { margin-top: 0; }
 }
 .recording-footer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
