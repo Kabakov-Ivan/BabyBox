@@ -197,6 +197,16 @@ navLinks.forEach(link => link.addEventListener('click', event => {
   setView(link.dataset.view);
 }));
 
+$('.brand')?.addEventListener('click', event => {
+  event.preventDefault();
+  setView('home');
+});
+
+window.addEventListener('hashchange', () => {
+  const hashView = location.hash.replace('#', '');
+  setView(['reports', 'recordings', 'settings'].includes(hashView) ? hashView : 'home');
+});
+
 function setSettingsPane(name) {
   $$('.settings-menu-item[data-settings]').forEach(item => {
     item.classList.toggle('active', item.dataset.settings === name);
@@ -377,28 +387,23 @@ function setCameraMuted(muted) {
 }
 
 function setRecordButtons(recording) {
-  const label = recording ? '■ Остановить' : '● Начать запись';
   const pressed = String(!!recording);
-  ['#recordBtn', '#cameraRecordBtn'].forEach(selector => {
-    const btn = $(selector);
-    if (!btn) return;
-    if (selector === '#recordBtn') btn.textContent = label;
-    btn.setAttribute('aria-pressed', pressed);
-    btn.classList.toggle('is-recording', !!recording);
-    btn.setAttribute('aria-label', recording ? 'Остановить запись видео' : 'Начать запись видео');
-    btn.title = recording ? 'Остановить запись' : 'Запись видео';
-  });
+  const btn = $('#cameraRecordBtn');
+  if (!btn) return;
+  btn.setAttribute('aria-pressed', pressed);
+  btn.classList.toggle('is-recording', !!recording);
+  btn.setAttribute('aria-label', recording ? 'Остановить запись видео' : 'Начать запись видео');
+  btn.title = recording ? 'Остановить запись' : 'Запись видео';
 }
 
 function setCameraStatus(state, live = false) {
   $('#cameraState').textContent = state;
   $('#cameraDot')?.classList.toggle('is-live', live);
-  $('#qualityTag').textContent = live ? (mediaRecording ? 'REC' : 'Прямой эфир') : 'ОЖИДАНИЕ';
+  $('#qualityTag').textContent = live ? (mediaRecording ? 'Запись' : 'Прямой эфир') : 'Ожидание';
   $('#qualityTag').classList.toggle('is-live', live);
   $('#qualityTag').classList.toggle('is-recording', live && mediaRecording);
   $('#snapshotBtn').disabled = !live || mediaBusy;
   const canRecord = live || mediaRecording;
-  $('#recordBtn').disabled = !canRecord || mediaBusy;
   $('#cameraRecordBtn').disabled = !canRecord || mediaBusy;
   setCameraAudioEnabled(false);
   streamConnected = live;
@@ -727,7 +732,6 @@ async function toggleMediaRecording() {
 }
 
 $('#snapshotBtn').addEventListener('click', saveSnapshot);
-$('#recordBtn')?.addEventListener('click', toggleMediaRecording);
 $('#cameraRecordBtn')?.addEventListener('click', toggleMediaRecording);
 $('#refreshMediaBtn')?.addEventListener('click', () => {
   loadMediaGallery(true).then(ok => {
@@ -1409,12 +1413,25 @@ $('#unlockForm')?.addEventListener('submit', async event => {
   }
 });
 
+$('#unlockPin')?.addEventListener('keydown', event => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  $('#unlockForm')?.requestSubmit();
+});
+
 $$('.pin-pad [data-pin-digit]').forEach(button => button.addEventListener('click', () => {
   const input = $('#unlockPin');
   if (input.value.length < 8) input.value += button.dataset.pinDigit;
+  input.focus();
 }));
-$$('.pin-pad [data-pin-action="clear"]').forEach(button => button.addEventListener('click', () => { $('#unlockPin').value = ''; }));
-$$('.pin-pad [data-pin-action="backspace"]').forEach(button => button.addEventListener('click', () => { $('#unlockPin').value = $('#unlockPin').value.slice(0, -1); }));
+$$('.pin-pad [data-pin-action="clear"]').forEach(button => button.addEventListener('click', () => {
+  $('#unlockPin').value = '';
+  $('#unlockPin').focus();
+}));
+$$('.pin-pad [data-pin-action="backspace"]').forEach(button => button.addEventListener('click', () => {
+  $('#unlockPin').value = $('#unlockPin').value.slice(0, -1);
+  $('#unlockPin').focus();
+}));
 
 loadLullabyChoices();
 loadProfile();
