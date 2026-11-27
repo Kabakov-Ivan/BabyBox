@@ -17,6 +17,7 @@ SAVE_ROOT = Path(os.environ.get("BABYBOX_SAVE_ROOT", "/home/admin/Save_BabyBox")
 PROFILE_DIR = SAVE_ROOT / "profile"
 THEME_DIR = SAVE_ROOT / "theme"
 NIGHTLIGHT_DIR = SAVE_ROOT / "nightlight"
+NOTIFICATIONS_DIR = SAVE_ROOT / "notifications"
 SOUND_SAVE_DIR = SAVE_ROOT / "sounds"
 THEME_PALETTES = frozenset({"blue", "graphite"})
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
@@ -95,6 +96,19 @@ def save_autonight(enabled: bool) -> dict[str, Any]:
         "enabled": bool(enabled),
     }
     _replace_latest(NIGHTLIGHT_DIR, "nightlight.jsonl", row)
+    return row
+
+
+def load_notifications() -> dict[str, Any] | None:
+    return _latest(NOTIFICATIONS_DIR / "notifications.jsonl")
+
+
+def save_notifications(enabled: bool) -> dict[str, Any]:
+    row = {
+        "ts": int(time.time()),
+        "enabled": bool(enabled),
+    }
+    _replace_latest(NOTIFICATIONS_DIR, "notifications.jsonl", row)
     return row
 
 

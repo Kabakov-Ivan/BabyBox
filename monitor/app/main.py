@@ -183,6 +183,25 @@ def api_autonight():
     return jsonify(saved=True, enabled=row["enabled"], nightlight=row, **nightlight.status())
 
 
+@app.route("/api/notifications", methods=["GET", "POST"])
+def api_notifications():
+    if request.method == "GET":
+        try:
+            row = settings_store.load_notifications() or {}
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке уведомлений на устройстве"), 503
+        enabled = bool(row.get("enabled")) if row else False
+        return jsonify(saved=bool(row), enabled=enabled, notifications=row)
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get("enabled"))
+    try:
+        row = settings_store.save_notifications(enabled)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке уведомлений на устройстве"), 503
+    return jsonify(saved=True, enabled=row["enabled"], notifications=row)
+
+
 @app.route("/api/sounds", methods=["GET", "POST"])
 def api_sounds():
     sound_files = sorted(path.name for path in SOUNDS_DIR.glob("*.wav")) if SOUNDS_DIR.exists() else []

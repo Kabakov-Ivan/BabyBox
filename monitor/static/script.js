@@ -35,6 +35,17 @@ const emptyReadings = {
   temp_c: '—', humidity_pct: '—', co2_ppm: '—'
 };
 
+// Границы аларма относительно нормальной комнаты (~25.8°C / 34% / 450 ppm).
+const SENSOR_LIMITS = {
+  temp_c: { min: 20, max: 28, label: 'Температура', unit: '°C' },
+  humidity_pct: { min: 25, max: 60, label: 'Влажность', unit: '%' },
+  co2_ppm: { min: null, max: 1000, label: 'Уровень CO₂', unit: 'ppm' }
+};
+
+const latestSensorValues = { temp_c: null, humidity_pct: null, co2_ppm: null };
+const alarmActive = { temp_c: false, humidity_pct: false, co2_ppm: false };
+const alarmDismissed = { temp_c: false, humidity_pct: false, co2_ppm: false };
+
 // ~2.5s poll × 24 ≈ последняя минута показаний
 const SPARK_POINTS = 24;
 const sparkHistory = {
@@ -42,6 +53,95 @@ const sparkHistory = {
   humidity_pct: [],
   co2_ppm: []
 };
+
+function notificationsEnabled() {
+  return localStorage.getItem('radio-nanny-security-notifications') === '1';
+}
+
+function formatAlarmValue(key, value) {
+  if (key === 'co2_ppm') return String(Math.round(value));
+  return Number(value).toFixed(1).replace(/\.0$/, '');
+}
+
+function alarmKindFor(key, value) {
+  const limits = SENSOR_LIMITS[key];
+  if (!limits || !Number.isFinite(value)) return null;
+  if (limits.min != null && value < limits.min) return 'low';
+  if (limits.max != null && value > limits.max) return 'high';
+  return null;
+}
+
+function setMetricAlarmVisual(key, alarming) {
+  $(`[data-card="${key}"]`)?.classList.toggle('is-alarm', alarming);
+  $(`[data-report-metric="${key}"]`)?.classList.toggle('is-alarm', alarming);
+}
+
+function clearAlarmPopups() {
+  const stack = $('#alarmStack');
+  if (!stack) return;
+  stack.replaceChildren();
+}
+
+function removeAlarmPopup(key) {
+  $(`#alarmStack [data-alarm-key="${key}"]`)?.remove();
+}
+
+function showAlarmPopup(key, kind, value) {
+  const stack = $('#alarmStack');
+  const limits = SENSOR_LIMITS[key];
+  if (!stack || !limits || !notificationsEnabled()) return;
+  if ($(`#alarmStack [data-alarm-key="${key}"]`)) return;
+
+  const direction = kind === 'low' ? 'ниже нормы' : 'выше нормы';
+  const popup = document.createElement('div');
+  popup.className = 'alarm-popup';
+  popup.dataset.alarmKey = key;
+  popup.setAttribute('role', 'alert');
+
+  const title = document.createElement('h3');
+  title.textContent = `${limits.label}: ${formatAlarmValue(key, value)}${limits.unit} — ${direction}`;
+
+  const note = document.createElement('p');
+  note.textContent = 'Уведомление также отправлено на вашу электронную почту.';
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'alarm-close';
+  close.setAttribute('aria-label', 'Закрыть');
+  close.textContent = '×';
+  close.addEventListener('click', () => {
+    alarmDismissed[key] = true;
+    removeAlarmPopup(key);
+  });
+
+  popup.append(title, note, close);
+  stack.append(popup);
+}
+
+function evaluateSensorAlarms(readings = {}) {
+  Object.keys(SENSOR_LIMITS).forEach(key => {
+    if (!Object.hasOwn(readings, key)) return;
+    const value = Number(readings[key]);
+    if (!Number.isFinite(value)) return;
+    latestSensorValues[key] = value;
+
+    const kind = alarmKindFor(key, value);
+    const alarming = Boolean(kind);
+    const wasActive = alarmActive[key];
+    alarmActive[key] = alarming;
+    setMetricAlarmVisual(key, alarming);
+
+    if (!alarming) {
+      alarmDismissed[key] = false;
+      removeAlarmPopup(key);
+      return;
+    }
+
+    // Новый аларм или повтор после нормализации — показать попап (если включены уведомления).
+    if (!wasActive) alarmDismissed[key] = false;
+    if (!alarmDismissed[key]) showAlarmPopup(key, kind, value);
+  });
+}
 
 function linePathFromValues(values, width = 100, height = 24, minSpan = 0.4) {
   if (!values.length) return '';
@@ -119,6 +219,13 @@ function setReading(key, value, live = false) {
 function restoreEmptyReadings() {
   clearSparks();
   Object.entries(emptyReadings).forEach(([key, value]) => setReading(key, value, false));
+  Object.keys(SENSOR_LIMITS).forEach(key => {
+    alarmActive[key] = false;
+    alarmDismissed[key] = false;
+    latestSensorValues[key] = null;
+    setMetricAlarmVisual(key, false);
+  });
+  clearAlarmPopups();
 }
 
 function createEventRow(title, detail, tone = '') {
@@ -905,13 +1012,20 @@ function applyDevicePayload(payload) {
   if (Object.hasOwn(payload, 'autonight_enabled')) {
     applyAutoNightlightState(Boolean(payload.autonight_enabled));
   }
-  if (Object.hasOwn(payload, 'co2_state') && payload.co2_state) {
-    const state = $('[data-state="co2_ppm"]');
-    if (state) {
-      state.textContent = String(payload.co2_state);
-      state.classList.add('live-state');
-    }
-  }
+
+  const live = {};
+  Object.keys(SENSOR_LIMITS).forEach(key => {
+    const aliasesForKey = {
+      temp_c: ['temp_c', 'temperature', 'temperature_c'],
+      humidity_pct: ['humidity_pct', 'humidity'],
+      co2_ppm: ['co2_ppm', 'co2']
+    }[key];
+    const foundKey = aliasesForKey.find(name => Object.hasOwn(payload, name));
+    if (!foundKey) return;
+    const raw = Number(payload[foundKey]);
+    if (Number.isFinite(raw)) live[key] = raw;
+  });
+  evaluateSensorAlarms(live);
 }
 
 function statusEndpoint() {
@@ -954,6 +1068,7 @@ function applyDayReport(payload) {
     }
   }
 
+  const reportLive = {};
   ['temp_c', 'humidity_pct', 'co2_ppm'].forEach(key => {
     const block = payload[key] || {};
     const current = $(`[data-report="${key}"]`);
@@ -963,7 +1078,13 @@ function applyDayReport(payload) {
     if (min) min.textContent = formatReportValue(block.min);
     if (max) max.textContent = formatReportValue(block.max);
     drawReportChart(key, block.series || []);
+    if (block.current != null && Number.isFinite(Number(block.current))) {
+      reportLive[key] = Number(block.current);
+    } else {
+      setMetricAlarmVisual(key, Boolean(alarmActive[key]));
+    }
   });
+  if (Object.keys(reportLive).length) evaluateSensorAlarms(reportLive);
 }
 
 async function loadDayReport() {
@@ -1389,13 +1510,53 @@ lullabyAudio?.addEventListener('ended', () => {
   void sendCommand('lullaby', false);
 });
 
-function setSecurityNotifications(enabled) {
+function applyNotificationsState(enabled) {
   localStorage.setItem('radio-nanny-security-notifications', enabled ? '1' : '0');
   ['#securityNotificationsBtn', '#securityNotificationsBtnDetail'].forEach(selector => {
     const btn = $(selector);
     if (!btn) return;
     btn.setAttribute('aria-checked', String(enabled));
   });
+  if (!enabled) {
+    clearAlarmPopups();
+  } else {
+    Object.keys(SENSOR_LIMITS).forEach(key => {
+      if (!alarmActive[key] || alarmDismissed[key]) return;
+      const value = latestSensorValues[key];
+      if (!Number.isFinite(value)) return;
+      const kind = alarmKindFor(key, value);
+      if (kind) showAlarmPopup(key, kind, value);
+    });
+  }
+}
+
+async function setSecurityNotifications(enabled, { persist = true } = {}) {
+  applyNotificationsState(enabled);
+  if (!persist) return;
+  try {
+    const response = await fetch('/api/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: !!enabled }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.saved) throw new Error(data.error || 'Уведомления не сохранены');
+    if (typeof data.enabled === 'boolean') applyNotificationsState(data.enabled);
+  } catch (error) {
+    showToast(error.message || 'Не удалось сохранить уведомления на BabyBox.');
+  }
+}
+
+async function loadNotifications() {
+  applyNotificationsState(localStorage.getItem('radio-nanny-security-notifications') === '1');
+  try {
+    const response = await fetch('/api/notifications', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось прочитать уведомления');
+    if (typeof data.enabled === 'boolean') applyNotificationsState(data.enabled);
+  } catch {
+    // Локальный кэш уже применён.
+  }
 }
 
 ['#securityNotificationsBtn', '#securityNotificationsBtnDetail'].forEach(selector => {
@@ -1407,7 +1568,7 @@ function setSecurityNotifications(enabled) {
   });
 });
 
-setSecurityNotifications(localStorage.getItem('radio-nanny-security-notifications') === '1');
+loadNotifications();
 
 async function loadPinStatus() {
   try {
