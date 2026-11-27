@@ -375,8 +375,8 @@ def _primary_device_ip() -> str | None:
 
 
 def _vnc_url(ip: str) -> str:
-    # RealVNC / TigerVNC / macOS Screen Sharing — opens the system VNC client.
-    return f"vnc://{ip}:5900"
+    # Separate noVNC service on :6080 (does not touch the panel on :5000).
+    return f"http://{ip}:6080/vnc.html?autoconnect=1&resize=scale"
 
 
 def _system_stats() -> dict:

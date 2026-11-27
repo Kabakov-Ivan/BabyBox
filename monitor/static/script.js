@@ -1851,7 +1851,8 @@ async function loadDeveloperSystem() {
 
     const pageIp = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(location.hostname) ? location.hostname : null;
     developerDeviceIp = pageIp || data.ip || null;
-    developerVncUrl = developerDeviceIp ? `vnc://${developerDeviceIp}:5900` : (data.vnc_url || null);
+    developerVncUrl = data.vnc_url
+      || (developerDeviceIp ? `http://${developerDeviceIp}:6080/vnc.html?autoconnect=1&resize=scale` : null);
     $('#developerDeviceIp').textContent = developerDeviceIp || '—';
     $('#developerSshTarget').textContent = `admin@${developerDeviceIp || '—'}`;
     const vncBtn = $('#developerVncBtn');
@@ -1929,10 +1930,10 @@ $('#developerVncBtn')?.addEventListener('click', event => {
     showToast('Не удалось определить IP устройства.');
     return;
   }
-  const url = `vnc://${hostIp}:5900`;
+  // Отдельный сервис noVNC на :6080 — панель :5000 не затрагивается.
+  const url = `http://${hostIp}:6080/vnc.html?autoconnect=1&resize=scale`;
   developerVncUrl = url;
   event.currentTarget.setAttribute('href', url);
-  // Native RealVNC / TigerVNC / Screen Sharing via vnc:// — keep default <a> navigation.
 });
 
 $('#developerSshConnectBtn')?.addEventListener('click', async () => {
