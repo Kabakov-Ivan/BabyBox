@@ -55,6 +55,8 @@ const sparkHistory = {
 };
 
 function notificationsEnabled() {
+  const btn = $('#securityNotificationsBtn');
+  if (btn) return btn.getAttribute('aria-checked') === 'true';
   return localStorage.getItem('radio-nanny-security-notifications') === '1';
 }
 
@@ -120,7 +122,7 @@ function showAlarmPopup(key, kind, value) {
 
 function evaluateSensorAlarms(readings = {}) {
   Object.keys(SENSOR_LIMITS).forEach(key => {
-    if (!Object.hasOwn(readings, key)) return;
+    if (!Object.prototype.hasOwnProperty.call(readings, key)) return;
     const value = Number(readings[key]);
     if (!Number.isFinite(value)) return;
     latestSensorValues[key] = value;
@@ -137,9 +139,11 @@ function evaluateSensorAlarms(readings = {}) {
       return;
     }
 
-    // Новый аларм или повтор после нормализации — показать попап (если включены уведомления).
+    // Новый аларм — снова разрешить попап, даже если раньше закрыли крестиком.
     if (!wasActive) alarmDismissed[key] = false;
-    if (!alarmDismissed[key]) showAlarmPopup(key, kind, value);
+    if (notificationsEnabled() && !alarmDismissed[key]) {
+      showAlarmPopup(key, kind, value);
+    }
   });
 }
 

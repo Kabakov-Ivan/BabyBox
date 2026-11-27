@@ -1435,25 +1435,26 @@ body:not([data-view="home"]) .dashboard {
 .toast.show { opacity: 1; transform: translateY(0); }
 
 .alarm-stack {
-  position: fixed;
-  z-index: 90;
-  top: 16px;
+  position: absolute;
+  z-index: 200;
+  top: 64px;
   right: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(380px, calc(100vw - 28px));
+  width: min(380px, 34%);
+  max-width: calc(100% - 28px);
   pointer-events: none;
 }
 .alarm-popup {
   pointer-events: auto;
   position: relative;
   padding: 14px 40px 14px 14px;
-  border: 1px solid #c44a4a;
+  border: 1px solid #ff6b6b;
   border-radius: 12px;
-  background: #3a1515;
-  color: #ffe8e8;
-  box-shadow: 0 14px 40px rgb(0 0 0 / 40%);
+  background: #5a1212;
+  color: #fff5f5;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 45%);
   animation: alarm-in .22s ease;
 }
 .alarm-popup h3 {
@@ -1959,13 +1960,19 @@ body[data-theme="light"][data-palette="graphite"] .button-primary { color: #fff;
 @media (max-width: 900px) {
   body { height: auto; overflow: auto; }
   .stage {
-    position: static;
+    position: relative;
     width: 100%;
     height: auto;
     min-height: 100vh;
     transform: none;
     left: auto;
     top: auto;
+  }
+  .alarm-stack {
+    position: fixed;
+    top: 70px;
+    right: 12px;
+    width: min(380px, calc(100vw - 24px));
   }
   .topbar { flex: 0 0 auto; position: sticky; top: 0; }
   .app-shell { height: auto; overflow: visible; display: block; }
