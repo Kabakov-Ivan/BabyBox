@@ -50,6 +50,20 @@ systemctl daemon-reload
 systemctl enable babybox-novnc.service
 systemctl restart babybox-novnc.service
 
+# wayvnc на Raspberry Pi по умолчанию требует TLS/PAM (типы RA2/VeNCrypt),
+# а браузерный noVNC это не понимает → «ошибка подключения к серверу».
+# Для веб-клиента нужен простой режим без TLS-auth (только домашняя сеть).
+if [ -f /etc/wayvnc/config ]; then
+  echo "==> Настраиваем wayvnc под noVNC (enable_auth=false)"
+  cp -a /etc/wayvnc/config "/etc/wayvnc/config.bak.babybox.$(date +%Y%m%d%H%M%S)"
+  cat > /etc/wayvnc/config <<'EOF'
+use_relative_paths=true
+address=::
+enable_auth=false
+EOF
+  systemctl restart wayvnc.service || true
+fi
+
 echo
 echo "Готово. Панель на :5000 не трогали."
 echo "  noVNC:  http://<IP>:6080/vnc.html?autoconnect=1&resize=scale"
@@ -57,7 +71,10 @@ echo "  Прокси: websockify :6080 → 127.0.0.1:5900"
 echo
 echo "Проверка:"
 echo "  systemctl status babybox-novnc.service --no-pager"
+echo "  systemctl status wayvnc.service --no-pager"
 echo "  ss -lntp | grep -E '5000|6080|5900' || true"
 echo
-echo "Важно: на Pi должен быть включён обычный VNC-сервер на порту 5900"
-echo "  (RealVNC / TigerVNC / wayvnc). Иначе noVNC откроется, но не подключится."
+echo "Открой VNC из панели или напрямую:"
+echo "  http://192.168.0.156:6080/vnc.html?autoconnect=1&resize=scale"
+echo
+echo "Заметка: wayvnc без пароля (LAN). Панель :5000 не затронута."
