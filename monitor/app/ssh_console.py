@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import pty
+import re
 import select
 import signal
 import subprocess
@@ -15,6 +16,15 @@ from typing import Any
 SSH_USER = "admin"
 SSH_PASSWORD = "2376"
 
+# CSI / OSC / charset escapes from color prompts and readline bracketed-paste.
+_ANSI_RE = re.compile(
+    r"\x1b\[[0-9;?]*[ -/]*[@-~]"
+    r"|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)"
+    r"|\x1b[()][0-9A-Za-z]"
+    r"|\x1b."
+)
+_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
 _lock = threading.Lock()
 _proc: subprocess.Popen[Any] | None = None
 _master_fd: int | None = None
@@ -24,10 +34,23 @@ _alive = False
 _target = "127.0.0.1"
 
 
-def _append(text: str) -> None:
+def sanitize_terminal_text(text: str) -> str:
+    """Turn raw PTY output into readable plain text for the web console."""
     if not text:
+        return ""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = _ANSI_RE.sub("", text)
+    text = _CONTROL_RE.sub("", text)
+    # Collapse huge blank runs from cursor games, keep single newlines.
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
+
+
+def _append(text: str) -> None:
+    cleaned = sanitize_terminal_text(text)
+    if not cleaned:
         return
-    _buffer.append(text)
+    _buffer.append(cleaned)
 
 
 def _reader_loop(fd: int) -> None:
@@ -104,20 +127,25 @@ def stop() -> dict[str, Any]:
 
 
 def start(host: str | None = None) -> dict[str, Any]:
-    """Open an interactive login shell as the BabyBox service user (admin)."""
+    """Open a plain interactive shell as the BabyBox service user (admin)."""
     global _proc, _master_fd, _reader, _alive, _target
     stop()
     _target = (host or "127.0.0.1").strip() or "127.0.0.1"
     master, slave = pty.openpty()
     env = os.environ.copy()
-    env["TERM"] = "xterm-256color"
+    # Dumb terminal → almost no color / cursor sequences from bash & ls.
+    env["TERM"] = "dumb"
     env["HISTCONTROL"] = "ignoredups"
+    env["PS1"] = f"{SSH_USER}@{_target}:\\w $ "
+    env["PROMPT_COMMAND"] = ""
+    env["LS_COLORS"] = ""
+    env["CLICOLOR"] = "0"
     shell = env.get("SHELL") or "/bin/bash"
     home = str(os.path.expanduser("~") or f"/home/{SSH_USER}")
 
     try:
         proc = subprocess.Popen(
-            [shell, "-l"],
+            [shell, "--noprofile", "--norc", "-i"],
             stdin=slave,
             stdout=slave,
             stderr=slave,
@@ -147,7 +175,7 @@ def start(host: str | None = None) -> dict[str, Any]:
         _master_fd = master
         _alive = True
         _buffer.clear()
-        _append(f"[ssh] {SSH_USER}@{_target}  (локальная сессия устройства)\n")
+        _append(f"[ssh] {SSH_USER}@{_target}\n")
         _reader = threading.Thread(target=_reader_loop, args=(master,), daemon=True)
         _reader.start()
     return status()

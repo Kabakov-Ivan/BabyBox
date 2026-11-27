@@ -311,8 +311,42 @@ def _bytes_label(value: int) -> str:
     return f"{amount:.1f} {unit}"
 
 
+def _is_ipv4(value: str | None) -> bool:
+    return bool(value and re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", value))
+
+
+def _request_host_ip() -> str | None:
+    """IP from the URL the browser used to open the panel (most accurate)."""
+    try:
+        host = (request.host or "").split(":")[0].strip()
+    except RuntimeError:
+        return None
+    if _is_ipv4(host) and not host.startswith("127."):
+        return host
+    return None
+
+
 def _device_ipv4_addresses() -> list[str]:
     addresses: list[str] = []
+
+    # 1) Address from the current HTTP request host — what the user actually opened.
+    via_request = _request_host_ip()
+    if via_request:
+        addresses.append(via_request)
+
+    # 2) Default-route interface IP.
+    try:
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            peer = sock.getsockname()[0]
+            if _is_ipv4(peer) and not peer.startswith("127.") and peer not in addresses:
+                addresses.append(peer)
+    except OSError:
+        pass
+
+    # 3) All host addresses as fallback.
     try:
         result = subprocess.run(
             ["hostname", "-I"],
@@ -322,26 +356,15 @@ def _device_ipv4_addresses() -> list[str]:
             check=False,
         )
         for token in (result.stdout or "").split():
-            if re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", token) and not token.startswith("127."):
+            if _is_ipv4(token) and not token.startswith("127.") and token not in addresses:
                 addresses.append(token)
     except (FileNotFoundError, subprocess.SubprocessError):
         pass
 
-    try:
-        import socket
-
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect(("8.8.8.8", 80))
-            peer = sock.getsockname()[0]
-            if peer and not peer.startswith("127.") and peer not in addresses:
-                addresses.insert(0, peer)
-    except OSError:
-        pass
-
-    # Prefer LAN over the setup AP address when both are present.
+    # Keep discovery order, but push setup-AP / link-local to the end.
     ranked = sorted(
-        dict.fromkeys(addresses),
-        key=lambda ip: (ip.startswith("192.168.4."), ip.startswith("169.254."), ip),
+        addresses,
+        key=lambda ip: (ip.startswith("192.168.4."), ip.startswith("169.254.")),
     )
     return ranked
 
@@ -352,8 +375,8 @@ def _primary_device_ip() -> str | None:
 
 
 def _vnc_url(ip: str) -> str:
-    # noVNC / websockify default; opens in a normal browser tab.
-    return f"http://{ip}:6080/vnc.html?autoconnect=1&resize=remote&host={ip}&port=5900"
+    # RealVNC / TigerVNC / macOS Screen Sharing — opens the system VNC client.
+    return f"vnc://{ip}:5900"
 
 
 def _system_stats() -> dict:

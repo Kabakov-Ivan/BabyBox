@@ -1849,10 +1849,13 @@ async function loadDeveloperSystem() {
       ? `Свободно ${disk.free_label} из ${disk.total_label}`
       : 'Нет данных';
 
-    developerDeviceIp = data.ip || null;
-    developerVncUrl = data.vnc_url || (developerDeviceIp ? `http://${developerDeviceIp}:6080/vnc.html?autoconnect=1&resize=remote` : null);
+    const pageIp = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(location.hostname) ? location.hostname : null;
+    developerDeviceIp = pageIp || data.ip || null;
+    developerVncUrl = developerDeviceIp ? `vnc://${developerDeviceIp}:5900` : (data.vnc_url || null);
     $('#developerDeviceIp').textContent = developerDeviceIp || '—';
-    $('#developerSshTarget').textContent = data.ssh_target || `admin@${developerDeviceIp || '—'}`;
+    $('#developerSshTarget').textContent = `admin@${developerDeviceIp || '—'}`;
+    const vncBtn = $('#developerVncBtn');
+    if (vncBtn && developerVncUrl) vncBtn.setAttribute('href', developerVncUrl);
     if (data.ssh) setDeveloperSshConnected(!!data.ssh.connected);
   } catch (error) {
     $('#developerCpuTempNote').textContent = error.message || 'Ошибка чтения';
@@ -1915,11 +1918,21 @@ $('#developerShutdownBtn')?.addEventListener('click', () => {
   });
 });
 
-$('#developerVncBtn')?.addEventListener('click', () => {
-  if (!developerEnabled) return;
-  const hostIp = developerDeviceIp || location.hostname;
-  const url = developerVncUrl || `http://${hostIp}:6080/vnc.html?autoconnect=1&resize=remote&host=${hostIp}&port=5900`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+$('#developerVncBtn')?.addEventListener('click', event => {
+  if (!developerEnabled) {
+    event.preventDefault();
+    return;
+  }
+  const hostIp = developerDeviceIp || (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(location.hostname) ? location.hostname : null);
+  if (!hostIp) {
+    event.preventDefault();
+    showToast('Не удалось определить IP устройства.');
+    return;
+  }
+  const url = `vnc://${hostIp}:5900`;
+  developerVncUrl = url;
+  event.currentTarget.setAttribute('href', url);
+  // Native RealVNC / TigerVNC / Screen Sharing via vnc:// — keep default <a> navigation.
 });
 
 $('#developerSshConnectBtn')?.addEventListener('click', async () => {
