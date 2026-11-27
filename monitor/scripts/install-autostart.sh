@@ -54,6 +54,8 @@ sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|
 sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
   "${ROOT}/systemd/babybox-dht.service" > /etc/systemd/system/babybox-dht.service
 sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
+  "${ROOT}/systemd/babybox-mq135.service" > /etc/systemd/system/babybox-mq135.service
+sed "s|/home/admin/BabyBox/monitor|${APP_DIR}|g; s|User=admin|User=${USER_NAME}|g; s|Group=admin|Group=${USER_NAME}|g" \
   "${ROOT}/systemd/babybox-oled.service" > /etc/systemd/system/babybox-oled.service
 
 # hostapd / dnsmasq only started by boot script or restore_ap — not always-on
@@ -109,6 +111,7 @@ systemctl daemon-reload
 systemctl enable babybox-boot-wifi.service
 systemctl enable babybox-web.service
 systemctl enable babybox-dht.service
+systemctl enable babybox-mq135.service
 systemctl enable babybox-oled.service
 
 echo
@@ -163,6 +166,13 @@ echo "  - separate service: sudo systemctl status babybox-dht"
 echo "  - check file: cat /tmp/babybox-dht.json"
 echo "  - sensor history: ${SAVE_DIR}/sensors/"
 echo "  - check API: curl -s http://127.0.0.1:5000/api/status"
+echo
+echo "MQ-135 notes:"
+echo "  - VCC→5V (pin 2), GND→pin 6, DOUT→pin 11 (BCM GPIO 17)"
+echo "  - DOUT is digital threshold (pot on board); mapped to 450/1500 ppm for UI"
+echo "  - separate service: sudo systemctl status babybox-mq135"
+echo "  - check file: cat /tmp/babybox-mq135.json"
+echo "  - if inverted: Environment=MQ135_ALARM_IS_LOW=0"
 echo
 echo "Power button notes:"
 echo "  - Button: GPIO3 (phys pin 5) ↔ GND (phys pin 20)"

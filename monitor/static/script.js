@@ -905,6 +905,13 @@ function applyDevicePayload(payload) {
   if (Object.hasOwn(payload, 'autonight_enabled')) {
     applyAutoNightlightState(Boolean(payload.autonight_enabled));
   }
+  if (Object.hasOwn(payload, 'co2_state') && payload.co2_state) {
+    const state = $('[data-state="co2_ppm"]');
+    if (state) {
+      state.textContent = String(payload.co2_state);
+      state.classList.add('live-state');
+    }
+  }
 }
 
 function statusEndpoint() {
@@ -927,7 +934,8 @@ function drawReportChart(key, series) {
   const values = (series || [])
     .map(point => Number(point?.v))
     .filter(value => Number.isFinite(value));
-  path.setAttribute('d', linePathFromValues(values, 640, 120, key === 'humidity_pct' ? 2 : 0.6));
+  const span = key === 'humidity_pct' ? 2 : key === 'co2_ppm' ? 80 : 0.6;
+  path.setAttribute('d', linePathFromValues(values, 640, 120, span));
 }
 
 function applyDayReport(payload) {
@@ -946,7 +954,7 @@ function applyDayReport(payload) {
     }
   }
 
-  ['temp_c', 'humidity_pct'].forEach(key => {
+  ['temp_c', 'humidity_pct', 'co2_ppm'].forEach(key => {
     const block = payload[key] || {};
     const current = $(`[data-report="${key}"]`);
     const min = $(`[data-report-min="${key}"]`);

@@ -945,6 +945,7 @@ h1, h2, h3, p { margin-top: 0; }
   vector-effect: non-scaling-stroke;
 }
 .report-chart.humidity-line path { stroke: #58a5ff; }
+.report-chart.co2-line path { stroke: #52d7c9; }
 
 .recordings-panel-body {
   flex: 1;

@@ -1,0 +1,22 @@
+[Unit]
+Description=BabyBox MQ-135 air quality worker
+After=network.target
+PartOf=babybox-web.service
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+SupplementaryGroups=gpio
+WorkingDirectory=/home/admin/BabyBox/monitor/app
+Environment=PYTHONUNBUFFERED=1
+Environment=MQ135_BCM_PIN=17
+Environment=MQ135_STATUS_FILE=/tmp/babybox-mq135.json
+Environment=BABYBOX_SENSOR_DIR=/home/admin/Save_BabyBox/sensors
+Environment=MQ135_ALARM_IS_LOW=1
+ExecStart=/home/admin/BabyBox/monitor/.venv/bin/python /home/admin/BabyBox/monitor/app/mq135_worker.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

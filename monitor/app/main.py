@@ -9,6 +9,7 @@ from pathlib import Path
 from camera_stream import BOUNDARY, camera
 from dht_sensor import dht
 from media_store import media_store
+from mq135_sensor import mq135
 from nightlight import nightlight
 import settings_store
 from sensor_history import day_report
@@ -301,8 +302,9 @@ def api_camera():
 
 @app.route("/api/status")
 def api_status():
-    """Live sensor readings for the web panel (temperature / humidity)."""
+    """Live sensor readings for the web panel (climate + CO₂ + night light)."""
     payload = dht.status()
+    payload.update(mq135.status())
     payload.update(nightlight.status())
     return jsonify(payload)
 

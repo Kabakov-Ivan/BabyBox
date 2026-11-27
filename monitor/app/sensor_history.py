@@ -21,6 +21,7 @@ KEEP_DAYS = int(os.environ.get("BABYBOX_SENSOR_KEEP_DAYS", "14"))
 
 _lock = threading.Lock()
 _last_sample_at = 0.0
+_last_co2_sample_at = 0.0
 _last_cleanup_at = 0.0
 
 
@@ -32,8 +33,15 @@ def _local_today() -> date:
     return datetime.now().astimezone().date()
 
 
+def _maybe_cleanup(now: float) -> None:
+    global _last_cleanup_at
+    if now - _last_cleanup_at > 3600:
+        _last_cleanup_at = now
+        _cleanup_old_files()
+
+
 def append_sample(temp_c: float, humidity_pct: float, *, force: bool = False) -> bool:
-    """Append one sample for today. Throttled to SAMPLE_EVERY_SEC unless force."""
+    """Append one climate sample for today. Throttled to SAMPLE_EVERY_SEC unless force."""
     global _last_sample_at
     now = time.time()
     with _lock:
@@ -49,11 +57,27 @@ def append_sample(temp_c: float, humidity_pct: float, *, force: bool = False) ->
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, ensure_ascii=True) + "\n")
         _last_sample_at = now
-        # Cleanup at most once per hour — not on every sample.
-        global _last_cleanup_at
-        if now - _last_cleanup_at > 3600:
-            _last_cleanup_at = now
-            _cleanup_old_files()
+        _maybe_cleanup(now)
+        return True
+
+
+def append_co2_sample(co2_ppm: float, *, force: bool = False) -> bool:
+    """Append one CO₂ / air-quality sample. Separate throttle from DHT."""
+    global _last_co2_sample_at
+    now = time.time()
+    with _lock:
+        if not force and (now - _last_co2_sample_at) < SAMPLE_EVERY_SEC:
+            return False
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path = _day_path(_local_today())
+        row = {
+            "ts": now,
+            "co2_ppm": round(float(co2_ppm), 1),
+        }
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(row, ensure_ascii=True) + "\n")
+        _last_co2_sample_at = now
+        _maybe_cleanup(now)
         return True
 
 
