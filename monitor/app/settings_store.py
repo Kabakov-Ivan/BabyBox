@@ -18,10 +18,15 @@ PROFILE_DIR = SAVE_ROOT / "profile"
 THEME_DIR = SAVE_ROOT / "theme"
 NIGHTLIGHT_DIR = SAVE_ROOT / "nightlight"
 NOTIFICATIONS_DIR = SAVE_ROOT / "notifications"
+DEVELOPER_DIR = SAVE_ROOT / "developer"
 SOUND_SAVE_DIR = SAVE_ROOT / "sounds"
 THEME_PALETTES = frozenset({"blue", "graphite"})
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = MONITOR_ROOT.parent
 SECURITY_DIR = Path(os.environ.get("BABYBOX_PIN_DIR", str(MONITOR_ROOT / "security")))
+DEVELOPER_PASSWORD_FILE = Path(
+    os.environ.get("BABYBOX_DEVELOPER_PASSWORD_FILE", str(PROJECT_ROOT / "developer_password.txt"))
+)
 PIN_ITERATIONS = 180_000
 PIN_PATTERN = re.compile(r"^\d{4,8}$")
 _pin_guard = threading.Lock()
@@ -110,6 +115,38 @@ def save_notifications(enabled: bool) -> dict[str, Any]:
     }
     _replace_latest(NOTIFICATIONS_DIR, "notifications.jsonl", row)
     return row
+
+
+def load_developer() -> dict[str, Any] | None:
+    return _latest(DEVELOPER_DIR / "developer.jsonl")
+
+
+def save_developer(enabled: bool) -> dict[str, Any]:
+    row = {
+        "ts": int(time.time()),
+        "enabled": bool(enabled),
+    }
+    _replace_latest(DEVELOPER_DIR, "developer.jsonl", row)
+    return row
+
+
+def load_developer_password() -> str:
+    try:
+        text = DEVELOPER_PASSWORD_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return "7777"
+    for line in text.splitlines():
+        value = line.strip()
+        if value:
+            return value
+    return "7777"
+
+
+def verify_developer_password(password: str) -> bool:
+    if not isinstance(password, str):
+        return False
+    expected = load_developer_password()
+    return hmac.compare_digest(password.strip(), expected)
 
 
 def save_sound_default(filename: str) -> None:

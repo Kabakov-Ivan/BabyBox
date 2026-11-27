@@ -108,6 +108,11 @@ ${USER_NAME} ALL=(root) NOPASSWD: /usr/local/sbin/babybox-wifi
 EOF
 chmod 440 /etc/sudoers.d/babybox-wifi
 
+cat > /etc/sudoers.d/babybox-shutdown <<EOF
+${USER_NAME} ALL=(root) NOPASSWD: /sbin/shutdown
+EOF
+chmod 440 /etc/sudoers.d/babybox-shutdown
+
 systemctl daemon-reload
 systemctl enable babybox-boot-wifi.service
 systemctl enable babybox-web.service

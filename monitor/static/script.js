@@ -339,6 +339,7 @@ $$('.settings-menu-item[data-settings]').forEach(item => {
     if (name === 'profile') loadProfile();
     if (name === 'lullaby') loadLullabyChoices();
     if (name === 'pin') loadPinStatus();
+    if (name === 'developer') syncDeveloperPane();
   });
 });
 
@@ -1604,6 +1605,34 @@ $('#pinForm')?.addEventListener('submit', async event => {
 });
 
 const lockScreen = $('#lockScreen');
+let lockPurpose = 'panel';
+let developerEnabled = false;
+let developerStatsTimer = null;
+
+function openLockScreen({ purpose = 'panel', title, subtitle, submitLabel, cancellable = false } = {}) {
+  lockPurpose = purpose;
+  $('#lockTitle').textContent = title || (purpose === 'developer' ? 'Режим разработчика' : 'Панель заблокирована');
+  $('#lockSubtitle').textContent = subtitle || (purpose === 'developer'
+    ? 'Введите пароль разработчика, чтобы продолжить.'
+    : 'Введите PIN-код, чтобы продолжить.');
+  $('#unlockSubmitBtn').textContent = submitLabel || (purpose === 'developer' ? 'Подтвердить' : 'Разблокировать');
+  $('#unlockCancelBtn').hidden = !cancellable;
+  lockScreen.hidden = false;
+  if (purpose === 'panel') document.body.dataset.locked = 'true';
+  $('#unlockPin').value = '';
+  $('#unlockStatus').textContent = '';
+  $('#unlockPin').focus();
+}
+
+function closeLockScreen({ unlockPanel = false } = {}) {
+  lockScreen.hidden = true;
+  $('#unlockPin').value = '';
+  $('#unlockStatus').textContent = '';
+  $('#unlockCancelBtn').hidden = true;
+  if (unlockPanel || lockPurpose === 'panel') document.body.dataset.locked = 'false';
+  lockPurpose = 'panel';
+}
+
 $('#lockBtn')?.addEventListener('click', async () => {
   try {
     const response = await fetch('/api/pin/status', { cache: 'no-store' });
@@ -1613,23 +1642,50 @@ $('#lockBtn')?.addEventListener('click', async () => {
       setView('settings'); setSettingsPane('pin'); await loadPinStatus();
       return;
     }
-    lockScreen.hidden = false;
-    document.body.dataset.locked = 'true';
-    $('#unlockPin').value = '';
-    $('#unlockStatus').textContent = '';
-    $('#unlockPin').focus();
+    openLockScreen({ purpose: 'panel' });
   } catch { showToast('PIN-хранилище недоступно на устройстве.'); }
+});
+
+$('#unlockCancelBtn')?.addEventListener('click', () => {
+  if (lockPurpose === 'panel') return;
+  closeLockScreen();
 });
 
 $('#unlockForm')?.addEventListener('submit', async event => {
   event.preventDefault();
+  const pin = $('#unlockPin').value;
   try {
-    const response = await fetch('/api/pin/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('#unlockPin').value }) });
+    if (lockPurpose === 'developer-enable') {
+      const response = await fetch('/api/developer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: true, password: pin }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.saved || !data.enabled) throw new Error(data.error || 'Пароль не подошёл');
+      closeLockScreen();
+      applyDeveloperState(true);
+      setSettingsPane('developer');
+      syncDeveloperPane();
+      showToast('Режим разработчика включён.');
+      return;
+    }
+    if (lockPurpose === 'developer-shutdown') {
+      const response = await fetch('/api/developer/shutdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pin }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Не удалось выключить устройство');
+      closeLockScreen();
+      showToast(data.message || 'Выключение начато…');
+      return;
+    }
+    const response = await fetch('/api/pin/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
     const data = await response.json();
     if (!response.ok || !data.unlocked) throw new Error(data.error || 'PIN-код не подошёл');
-    lockScreen.hidden = true;
-    document.body.dataset.locked = 'false';
-    $('#unlockPin').value = '';
+    closeLockScreen({ unlockPanel: true });
   } catch (error) {
     $('#unlockStatus').textContent = error.message || 'PIN-код не подошёл.';
     $('#unlockPin').value = '';
@@ -1656,6 +1712,150 @@ $$('.pin-pad [data-pin-action="backspace"]').forEach(button => button.addEventLi
   $('#unlockPin').value = $('#unlockPin').value.slice(0, -1);
   $('#unlockPin').focus();
 }));
+
+function applyDeveloperState(enabled) {
+  developerEnabled = !!enabled;
+  localStorage.setItem('radio-nanny-developer-mode', developerEnabled ? '1' : '0');
+  ['#developerModeBtn'].forEach(selector => {
+    const btn = $(selector);
+    if (!btn) return;
+    btn.setAttribute('aria-checked', String(developerEnabled));
+  });
+  syncDeveloperPane();
+}
+
+function stopDeveloperStats() {
+  if (developerStatsTimer) {
+    clearInterval(developerStatsTimer);
+    developerStatsTimer = null;
+  }
+}
+
+function syncDeveloperPane() {
+  const locked = $('#developerLocked');
+  const body = $('#developerBody');
+  const shutdownBtn = $('#developerShutdownBtn');
+  if (locked) locked.hidden = developerEnabled;
+  if (body) body.hidden = !developerEnabled;
+  if (shutdownBtn) shutdownBtn.hidden = !developerEnabled;
+  if (!developerEnabled) {
+    stopDeveloperStats();
+    return;
+  }
+  const pane = $('.settings-pane[data-pane="developer"]');
+  if (pane?.classList.contains('active')) {
+    void loadDeveloperSystem();
+    if (!developerStatsTimer) {
+      developerStatsTimer = setInterval(() => {
+        if (!$('.settings-pane[data-pane="developer"]')?.classList.contains('active')) {
+          stopDeveloperStats();
+          return;
+        }
+        void loadDeveloperSystem();
+      }, 2500);
+    }
+  } else {
+    stopDeveloperStats();
+  }
+}
+
+function setMeter(barId, labelId, pct, labelText) {
+  const bar = $(barId);
+  const label = $(labelId);
+  const value = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+  if (bar) bar.style.width = `${value}%`;
+  if (label) label.textContent = labelText;
+}
+
+async function loadDeveloperSystem() {
+  if (!developerEnabled) return;
+  try {
+    const response = await fetch('/api/developer/system', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось получить состояние системы');
+
+    const temp = data.cpu_temp_c;
+    $('#developerCpuTemp').textContent = Number.isFinite(temp) ? temp.toFixed(1) : '—';
+    $('#developerCpuTempNote').textContent = Number.isFinite(temp)
+      ? (temp >= 75 ? 'Горячо' : temp >= 60 ? 'Тёпло' : 'Норма')
+      : 'Нет данных';
+
+    const cpu = data.cpu_usage_pct;
+    setMeter('#developerCpuUsageBar', '#developerCpuUsageLabel', cpu, Number.isFinite(cpu) ? `${cpu.toFixed(0)}%` : '—');
+
+    const ram = data.ram || {};
+    setMeter('#developerRamBar', '#developerRamLabel', ram.used_pct, Number.isFinite(ram.used_pct) ? `${ram.used_pct.toFixed(0)}%` : '—');
+    $('#developerRamNote').textContent = ram.used_label && ram.total_label
+      ? `${ram.used_label} из ${ram.total_label} · свободно ${ram.free_label || '—'}`
+      : 'Нет данных';
+
+    const disk = data.disk || {};
+    setMeter('#developerDiskBar', '#developerDiskLabel', disk.used_pct, Number.isFinite(disk.used_pct) ? `${disk.used_pct.toFixed(0)}%` : '—');
+    $('#developerDiskNote').textContent = disk.free_label && disk.total_label
+      ? `Свободно ${disk.free_label} из ${disk.total_label}`
+      : 'Нет данных';
+  } catch (error) {
+    $('#developerCpuTempNote').textContent = error.message || 'Ошибка чтения';
+  }
+}
+
+async function setDeveloperMode(enabled) {
+  if (enabled) {
+    openLockScreen({
+      purpose: 'developer-enable',
+      title: 'Режим разработчика',
+      subtitle: 'Введите пароль разработчика, чтобы включить режим.',
+      submitLabel: 'Включить',
+      cancellable: true,
+    });
+    return;
+  }
+  applyDeveloperState(false);
+  try {
+    const response = await fetch('/api/developer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.saved) throw new Error(data.error || 'Режим разработчика не сохранён');
+    if (typeof data.enabled === 'boolean') applyDeveloperState(data.enabled);
+  } catch (error) {
+    showToast(error.message || 'Не удалось сохранить режим разработчика на BabyBox.');
+  }
+}
+
+async function loadDeveloperMode() {
+  applyDeveloperState(localStorage.getItem('radio-nanny-developer-mode') === '1');
+  try {
+    const response = await fetch('/api/developer', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Не удалось прочитать режим разработчика');
+    if (typeof data.enabled === 'boolean') applyDeveloperState(data.enabled);
+  } catch {
+    // Локальный кэш уже применён.
+  }
+}
+
+$('#developerModeBtn')?.addEventListener('click', event => {
+  event.stopPropagation();
+  const enabled = $('#developerModeBtn').getAttribute('aria-checked') !== 'true';
+  setDeveloperMode(enabled);
+  if (!enabled) setSettingsPane('developer');
+});
+
+$('#developerShutdownBtn')?.addEventListener('click', () => {
+  if (!developerEnabled) return;
+  openLockScreen({
+    purpose: 'developer-shutdown',
+    title: 'Выключение устройства',
+    subtitle: 'Введите пароль разработчика, чтобы выключить Raspberry Pi.',
+    submitLabel: 'Выключить',
+    cancellable: true,
+  });
+});
+
+loadDeveloperMode();
 
 loadLullabyChoices();
 loadProfile();

@@ -1366,6 +1366,146 @@ body.media-viewer-open {
   justify-content: space-between;
   gap: 16px;
 }
+.developer-pane-head { align-items: center; }
+.developer-shutdown-btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, #ff6b7a 35%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, #ff5d75 12%, transparent);
+  color: #ff8b9a;
+  flex: 0 0 auto;
+}
+.developer-shutdown-btn:hover {
+  background: color-mix(in srgb, #ff5d75 22%, transparent);
+  color: #ffb0ba;
+}
+.developer-shutdown-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.developer-shutdown-btn[hidden],
+.developer-locked[hidden],
+.developer-body[hidden] { display: none; }
+.developer-locked {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 14px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 14px;
+}
+.developer-locked p { margin: 0; max-width: 320px; line-height: 1.45; }
+.developer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.developer-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.developer-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #2e353e;
+  border-radius: 14px;
+  background: var(--panel-soft);
+}
+.developer-stat-temp {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.developer-stat small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .02em;
+}
+.developer-stat strong {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+}
+.developer-stat strong em {
+  font-style: normal;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.developer-stat-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.developer-stat-temp .developer-stat-note {
+  margin-left: auto;
+  align-self: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+  font-weight: 650;
+}
+.developer-meter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.developer-meter-head b {
+  font-size: 13px;
+  font-weight: 750;
+}
+.developer-meter {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+.developer-meter i {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent-strong, var(--accent)));
+  transition: width .35s ease;
+}
+body[data-theme="light"] .developer-stat {
+  border-color: var(--border);
+}
+body[data-theme="light"] .developer-shutdown-btn {
+  background: #fff1f3;
+  border-color: #f3c2c9;
+  color: #d9485f;
+}
+@media (max-width: 900px) {
+  .developer-stats { grid-template-columns: 1fr; }
+  .developer-stat-temp { grid-column: auto; }
+}
 .event-list {
   flex: 1;
   min-height: 0;
@@ -1852,6 +1992,7 @@ body[data-palette="graphite"] .control-lullaby[aria-pressed="true"] small { colo
 .pin-pad button:hover { background: var(--panel-hover); }
 .pin-pad button[data-pin-action] { font-size: 12px; font-weight: 600; }
 #unlockForm .button { width: 100%; }
+#unlockCancelBtn { margin-top: 2px; }
 .connection-pill, .device-status { border-radius: 10px; }
 @media (max-width: 700px) {
   .profile-fields, .lullaby-list { grid-template-columns: 1fr; }

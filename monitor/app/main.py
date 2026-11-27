@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, Response, send_from_
 import subprocess
 import re
 import json
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -200,6 +201,225 @@ def api_notifications():
     except OSError:
         return jsonify(saved=False, error="Нет доступа к папке уведомлений на устройстве"), 503
     return jsonify(saved=True, enabled=row["enabled"], notifications=row)
+
+
+def _developer_enabled() -> bool:
+    try:
+        row = settings_store.load_developer() or {}
+    except OSError:
+        return False
+    return bool(row.get("enabled"))
+
+
+def _read_cpu_temp_c() -> float | None:
+    candidates = (
+        Path("/sys/class/thermal/thermal_zone0/temp"),
+        Path("/sys/class/hwmon/hwmon0/temp1_input"),
+    )
+    for path in candidates:
+        try:
+            raw = path.read_text(encoding="utf-8").strip()
+            value = float(raw)
+            if value > 1000:
+                value /= 1000.0
+            return round(value, 1)
+        except (OSError, ValueError):
+            continue
+    try:
+        out = subprocess.check_output(
+            ["vcgencmd", "measure_temp"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=1.5,
+        )
+        match = re.search(r"temp=([0-9.]+)", out)
+        if match:
+            return round(float(match.group(1)), 1)
+    except (FileNotFoundError, subprocess.SubprocessError, ValueError):
+        pass
+    return None
+
+
+def _read_meminfo() -> dict[str, int]:
+    info: dict[str, int] = {}
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            key = parts[0].rstrip(":")
+            try:
+                info[key] = int(parts[1]) * 1024
+            except ValueError:
+                continue
+    except OSError:
+        pass
+    return info
+
+
+def _read_cpu_times() -> tuple[int, int] | None:
+    try:
+        line = Path("/proc/stat").read_text(encoding="utf-8").splitlines()[0]
+    except (OSError, IndexError):
+        return None
+    parts = line.split()
+    if not parts or parts[0] != "cpu" or len(parts) < 5:
+        return None
+    try:
+        values = [int(item) for item in parts[1:]]
+    except ValueError:
+        return None
+    total = sum(values)
+    idle = values[3] + (values[4] if len(values) > 4 else 0)
+    return total, idle
+
+
+_cpu_sample_lock = threading.Lock()
+_cpu_sample: tuple[int, int] | None = None
+
+
+def _cpu_usage_percent() -> float | None:
+    global _cpu_sample
+    current = _read_cpu_times()
+    if current is None:
+        return None
+    with _cpu_sample_lock:
+        previous = _cpu_sample
+        _cpu_sample = current
+    if previous is None:
+        return None
+    total_delta = current[0] - previous[0]
+    idle_delta = current[1] - previous[1]
+    if total_delta <= 0:
+        return 0.0
+    busy = max(0.0, min(100.0, (1.0 - (idle_delta / total_delta)) * 100.0))
+    return round(busy, 1)
+
+
+def _bytes_label(value: int) -> str:
+    units = ("Б", "КБ", "МБ", "ГБ", "ТБ")
+    amount = float(max(0, value))
+    unit = units[0]
+    for candidate in units:
+        unit = candidate
+        if amount < 1024 or candidate == units[-1]:
+            break
+        amount /= 1024.0
+    if unit in ("Б", "КБ"):
+        return f"{int(amount)} {unit}"
+    return f"{amount:.1f} {unit}"
+
+
+def _system_stats() -> dict:
+    mem = _read_meminfo()
+    mem_total = int(mem.get("MemTotal") or 0)
+    mem_available = int(mem.get("MemAvailable") or mem.get("MemFree") or 0)
+    mem_used = max(0, mem_total - mem_available) if mem_total else 0
+    mem_pct = round((mem_used / mem_total) * 100.0, 1) if mem_total else 0.0
+
+    try:
+        disk = shutil.disk_usage("/")
+        disk_total = int(disk.total)
+        disk_used = int(disk.used)
+        disk_free = int(disk.free)
+    except OSError:
+        disk_total = disk_used = disk_free = 0
+    disk_pct = round((disk_used / disk_total) * 100.0, 1) if disk_total else 0.0
+
+    cpu_temp = _read_cpu_temp_c()
+    cpu_usage = _cpu_usage_percent()
+    return {
+        "cpu_temp_c": cpu_temp,
+        "cpu_usage_pct": cpu_usage,
+        "ram": {
+            "total_bytes": mem_total,
+            "used_bytes": mem_used,
+            "free_bytes": mem_available,
+            "used_pct": mem_pct,
+            "total_label": _bytes_label(mem_total),
+            "used_label": _bytes_label(mem_used),
+            "free_label": _bytes_label(mem_available),
+        },
+        "disk": {
+            "total_bytes": disk_total,
+            "used_bytes": disk_used,
+            "free_bytes": disk_free,
+            "used_pct": disk_pct,
+            "total_label": _bytes_label(disk_total),
+            "used_label": _bytes_label(disk_used),
+            "free_label": _bytes_label(disk_free),
+        },
+    }
+
+
+@app.route("/api/developer", methods=["GET", "POST"])
+def api_developer():
+    if request.method == "GET":
+        try:
+            row = settings_store.load_developer() or {}
+        except OSError:
+            return jsonify(saved=False, error="Нет доступа к папке разработчика на устройстве"), 503
+        enabled = bool(row.get("enabled")) if row else False
+        return jsonify(saved=bool(row), enabled=enabled, developer=row)
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get("enabled"))
+    if enabled:
+        password = data.get("password", "")
+        if not isinstance(password, str) or not settings_store.verify_developer_password(password):
+            return jsonify(saved=False, enabled=False, error="Пароль не подошёл"), 403
+    try:
+        row = settings_store.save_developer(enabled)
+    except OSError:
+        return jsonify(saved=False, error="Нет доступа к папке разработчика на устройстве"), 503
+    return jsonify(saved=True, enabled=row["enabled"], developer=row)
+
+
+@app.route("/api/developer/verify", methods=["POST"])
+def api_developer_verify():
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", data.get("pin", ""))
+    if not isinstance(password, str) or not password.strip():
+        return jsonify(ok=False, error="Введите пароль"), 400
+    if not settings_store.verify_developer_password(password):
+        return jsonify(ok=False, error="Пароль не подошёл"), 403
+    return jsonify(ok=True)
+
+
+@app.route("/api/developer/system")
+def api_developer_system():
+    if not _developer_enabled():
+        return jsonify(error="Режим разработчика выключен"), 403
+    return jsonify(ok=True, **_system_stats())
+
+
+@app.route("/api/developer/shutdown", methods=["POST"])
+def api_developer_shutdown():
+    if not _developer_enabled():
+        return jsonify(ok=False, error="Режим разработчика выключен"), 403
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", data.get("pin", ""))
+    if not isinstance(password, str) or not settings_store.verify_developer_password(password):
+        return jsonify(ok=False, error="Пароль не подошёл"), 403
+
+    def _shutdown_later() -> None:
+        time.sleep(1.2)
+        commands = (
+            ["/sbin/shutdown", "-h", "now"],
+            ["sudo", "-n", "/sbin/shutdown", "-h", "now"],
+        )
+        for command in commands:
+            try:
+                result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    app.logger.info("Developer shutdown requested via %s", command[0])
+                    return
+            except Exception:
+                app.logger.exception("Developer shutdown failed for %s", command)
+        app.logger.error("Developer shutdown could not start")
+
+    threading.Thread(target=_shutdown_later, daemon=True).start()
+    return jsonify(ok=True, message="Выключение начато")
 
 
 @app.route("/api/sounds", methods=["GET", "POST"])
