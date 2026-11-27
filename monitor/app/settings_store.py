@@ -22,10 +22,9 @@ DEVELOPER_DIR = SAVE_ROOT / "developer"
 SOUND_SAVE_DIR = SAVE_ROOT / "sounds"
 THEME_PALETTES = frozenset({"blue", "graphite"})
 MONITOR_ROOT = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = MONITOR_ROOT.parent
 SECURITY_DIR = Path(os.environ.get("BABYBOX_PIN_DIR", str(MONITOR_ROOT / "security")))
 DEVELOPER_PASSWORD_FILE = Path(
-    os.environ.get("BABYBOX_DEVELOPER_PASSWORD_FILE", str(PROJECT_ROOT / "developer_password.txt"))
+    os.environ.get("BABYBOX_DEVELOPER_PASSWORD_FILE", str(MONITOR_ROOT / "developer.txt"))
 )
 PIN_ITERATIONS = 180_000
 PIN_PATTERN = re.compile(r"^\d{4,8}$")

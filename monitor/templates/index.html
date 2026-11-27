@@ -325,9 +325,9 @@
               <span class="settings-menu-copy"><b>Лента событий</b><small>Журнал действий</small></span>
             </button>
             <div class="settings-menu-item settings-toggle-row" data-settings="developer">
-              <span class="settings-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16.2 3.8 20.2 7.8 8.5 19.5 4 20.5l1-4.5z"/><path d="m14.5 5.5 4 4"/><path d="M4 14h4M4 10h2"/></svg></span>
-              <span class="settings-menu-copy"><b>Режим разработчика</b><small>Система и диагностика</small></span>
-              <button class="switch" id="developerModeBtn" type="button" role="switch" aria-checked="false" aria-label="Режим разработчика" title="Режим разработчика"><i></i></button>
+              <span class="settings-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg></span>
+              <span class="settings-menu-copy"><b>Тестирование</b><small>Режим разработчика</small></span>
+              <button class="switch" id="developerModeBtn" type="button" role="switch" aria-checked="false" aria-label="Тестирование" title="Тестирование"><i></i></button>
             </div>
           </aside>
 
@@ -443,15 +443,15 @@
             <div class="settings-pane" data-pane="developer" hidden>
               <div class="settings-pane-head developer-pane-head">
                 <div>
-                  <h2>Режим разработчика</h2>
-                  <p>Состояние Raspberry Pi и системные ресурсы.</p>
+                  <h2>Тестирование</h2>
+                  <p>Режим разработчика: система, SSH и VNC.</p>
                 </div>
                 <button class="developer-shutdown-btn" id="developerShutdownBtn" type="button" aria-label="Выключить Raspberry Pi" title="Выключить Raspberry Pi">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
                 </button>
               </div>
               <div class="developer-locked" id="developerLocked" hidden>
-                <p>Включите режим разработчика — потребуется пароль.</p>
+                <p>Включите режим разработчика</p>
               </div>
               <div class="developer-body" id="developerBody" hidden>
                 <div class="developer-stats">
@@ -483,6 +483,33 @@
                     <div class="developer-meter" aria-hidden="true"><i id="developerDiskBar"></i></div>
                     <span class="developer-stat-note" id="developerDiskNote">—</span>
                   </article>
+                </div>
+
+                <div class="developer-remote setting-block">
+                  <div class="developer-remote-head">
+                    <div>
+                      <h3>Удалённый доступ</h3>
+                      <p>IP подтягивается с устройства. Логин уже задан в прошивке.</p>
+                    </div>
+                    <div class="developer-remote-meta">
+                      <span class="developer-ip-pill">IP <b id="developerDeviceIp">—</b></span>
+                      <button class="button button-secondary" id="developerVncBtn" type="button">Открыть VNC</button>
+                    </div>
+                  </div>
+                  <div class="developer-ssh">
+                    <div class="developer-ssh-top">
+                      <small>SSH · <span id="developerSshTarget">admin@—</span></small>
+                      <div class="developer-ssh-actions">
+                        <button class="text-button" id="developerSshConnectBtn" type="button">Подключить</button>
+                        <button class="text-button" id="developerSshDisconnectBtn" type="button" hidden>Отключить</button>
+                      </div>
+                    </div>
+                    <pre class="developer-ssh-out" id="developerSshOut" aria-live="polite"></pre>
+                    <form class="developer-ssh-form" id="developerSshForm">
+                      <input id="developerSshInput" type="text" autocomplete="off" spellcheck="false" placeholder="Команда…" disabled>
+                      <button class="button button-primary" type="submit" id="developerSshSendBtn" disabled>↵</button>
+                    </form>
+                  </div>
                 </div>
               </div>
             </div>

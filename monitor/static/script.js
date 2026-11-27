@@ -1608,6 +1608,9 @@ const lockScreen = $('#lockScreen');
 let lockPurpose = 'panel';
 let developerEnabled = false;
 let developerStatsTimer = null;
+let developerSshTimer = null;
+let developerVncUrl = null;
+let developerDeviceIp = null;
 
 function openLockScreen({ purpose = 'panel', title, subtitle, submitLabel, cancellable = false } = {}) {
   lockPurpose = purpose;
@@ -1729,6 +1732,55 @@ function stopDeveloperStats() {
     clearInterval(developerStatsTimer);
     developerStatsTimer = null;
   }
+  stopDeveloperSshPolling();
+}
+
+function stopDeveloperSshPolling() {
+  if (developerSshTimer) {
+    clearInterval(developerSshTimer);
+    developerSshTimer = null;
+  }
+}
+
+function setDeveloperSshConnected(connected) {
+  const input = $('#developerSshInput');
+  const send = $('#developerSshSendBtn');
+  const connectBtn = $('#developerSshConnectBtn');
+  const disconnectBtn = $('#developerSshDisconnectBtn');
+  if (input) input.disabled = !connected;
+  if (send) send.disabled = !connected;
+  if (connectBtn) connectBtn.hidden = !!connected;
+  if (disconnectBtn) disconnectBtn.hidden = !connected;
+  if (!connected) stopDeveloperSshPolling();
+}
+
+function appendDeveloperSshOutput(text) {
+  if (!text) return;
+  const out = $('#developerSshOut');
+  if (!out) return;
+  out.textContent += text;
+  if (out.textContent.length > 20000) out.textContent = out.textContent.slice(-16000);
+  out.scrollTop = out.scrollHeight;
+}
+
+async function pollDeveloperSsh() {
+  if (!developerEnabled) return;
+  try {
+    const response = await fetch('/api/developer/ssh', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'SSH недоступен');
+    appendDeveloperSshOutput(data.output || '');
+    setDeveloperSshConnected(!!data.connected);
+    if (!data.connected) stopDeveloperSshPolling();
+  } catch {
+    stopDeveloperSshPolling();
+  }
+}
+
+function startDeveloperSshPolling() {
+  stopDeveloperSshPolling();
+  developerSshTimer = setInterval(() => { void pollDeveloperSsh(); }, 700);
+  void pollDeveloperSsh();
 }
 
 function syncDeveloperPane() {
@@ -1740,6 +1792,8 @@ function syncDeveloperPane() {
   if (shutdownBtn) shutdownBtn.hidden = !developerEnabled;
   if (!developerEnabled) {
     stopDeveloperStats();
+    setDeveloperSshConnected(false);
+    void fetch('/api/developer/ssh', { method: 'DELETE' }).catch(() => {});
     return;
   }
   const pane = $('.settings-pane[data-pane="developer"]');
@@ -1794,6 +1848,12 @@ async function loadDeveloperSystem() {
     $('#developerDiskNote').textContent = disk.free_label && disk.total_label
       ? `Свободно ${disk.free_label} из ${disk.total_label}`
       : 'Нет данных';
+
+    developerDeviceIp = data.ip || null;
+    developerVncUrl = data.vnc_url || (developerDeviceIp ? `http://${developerDeviceIp}:6080/vnc.html?autoconnect=1&resize=remote` : null);
+    $('#developerDeviceIp').textContent = developerDeviceIp || '—';
+    $('#developerSshTarget').textContent = data.ssh_target || `admin@${developerDeviceIp || '—'}`;
+    if (data.ssh) setDeveloperSshConnected(!!data.ssh.connected);
   } catch (error) {
     $('#developerCpuTempNote').textContent = error.message || 'Ошибка чтения';
   }
@@ -1803,8 +1863,8 @@ async function setDeveloperMode(enabled) {
   if (enabled) {
     openLockScreen({
       purpose: 'developer-enable',
-      title: 'Режим разработчика',
-      subtitle: 'Введите пароль разработчика, чтобы включить режим.',
+      title: 'Тестирование',
+      subtitle: 'Введите пароль, чтобы включить режим разработчика.',
       submitLabel: 'Включить',
       cancellable: true,
     });
@@ -1853,6 +1913,62 @@ $('#developerShutdownBtn')?.addEventListener('click', () => {
     submitLabel: 'Выключить',
     cancellable: true,
   });
+});
+
+$('#developerVncBtn')?.addEventListener('click', () => {
+  if (!developerEnabled) return;
+  const hostIp = developerDeviceIp || location.hostname;
+  const url = developerVncUrl || `http://${hostIp}:6080/vnc.html?autoconnect=1&resize=remote&host=${hostIp}&port=5900`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+});
+
+$('#developerSshConnectBtn')?.addEventListener('click', async () => {
+  if (!developerEnabled) return;
+  const out = $('#developerSshOut');
+  if (out) out.textContent = '';
+  try {
+    const response = await fetch('/api/developer/ssh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'connect', host: developerDeviceIp || location.hostname }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Не удалось подключить SSH');
+    appendDeveloperSshOutput(data.output || '');
+    setDeveloperSshConnected(true);
+    startDeveloperSshPolling();
+    $('#developerSshInput')?.focus();
+  } catch (error) {
+    showToast(error.message || 'SSH не подключился.');
+  }
+});
+
+$('#developerSshDisconnectBtn')?.addEventListener('click', async () => {
+  try {
+    await fetch('/api/developer/ssh', { method: 'DELETE' });
+  } catch { /* ignore */ }
+  setDeveloperSshConnected(false);
+  appendDeveloperSshOutput('\n[отключено]\n');
+});
+
+$('#developerSshForm')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const input = $('#developerSshInput');
+  if (!input || input.disabled) return;
+  const command = input.value;
+  input.value = '';
+  try {
+    const response = await fetch('/api/developer/ssh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'input', input: command }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Команда не отправлена');
+    startDeveloperSshPolling();
+  } catch (error) {
+    appendDeveloperSshOutput(`\n[ошибка] ${error.message || 'сбой ввода'}\n`);
+  }
 });
 
 loadDeveloperMode();

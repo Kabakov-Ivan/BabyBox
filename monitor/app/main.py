@@ -13,6 +13,7 @@ from media_store import media_store
 from mq135_sensor import mq135
 from nightlight import nightlight
 import settings_store
+import ssh_console
 from sensor_history import day_report
 
 
@@ -310,6 +311,51 @@ def _bytes_label(value: int) -> str:
     return f"{amount:.1f} {unit}"
 
 
+def _device_ipv4_addresses() -> list[str]:
+    addresses: list[str] = []
+    try:
+        result = subprocess.run(
+            ["hostname", "-I"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        for token in (result.stdout or "").split():
+            if re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", token) and not token.startswith("127."):
+                addresses.append(token)
+    except (FileNotFoundError, subprocess.SubprocessError):
+        pass
+
+    try:
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            peer = sock.getsockname()[0]
+            if peer and not peer.startswith("127.") and peer not in addresses:
+                addresses.insert(0, peer)
+    except OSError:
+        pass
+
+    # Prefer LAN over the setup AP address when both are present.
+    ranked = sorted(
+        dict.fromkeys(addresses),
+        key=lambda ip: (ip.startswith("192.168.4."), ip.startswith("169.254."), ip),
+    )
+    return ranked
+
+
+def _primary_device_ip() -> str | None:
+    addresses = _device_ipv4_addresses()
+    return addresses[0] if addresses else None
+
+
+def _vnc_url(ip: str) -> str:
+    # noVNC / websockify default; opens in a normal browser tab.
+    return f"http://{ip}:6080/vnc.html?autoconnect=1&resize=remote&host={ip}&port=5900"
+
+
 def _system_stats() -> dict:
     mem = _read_meminfo()
     mem_total = int(mem.get("MemTotal") or 0)
@@ -328,9 +374,16 @@ def _system_stats() -> dict:
 
     cpu_temp = _read_cpu_temp_c()
     cpu_usage = _cpu_usage_percent()
+    ip = _primary_device_ip()
     return {
         "cpu_temp_c": cpu_temp,
         "cpu_usage_pct": cpu_usage,
+        "ip": ip,
+        "ips": _device_ipv4_addresses(),
+        "ssh_user": ssh_console.SSH_USER,
+        "ssh_target": f"{ssh_console.SSH_USER}@{ip or '—'}",
+        "vnc_url": _vnc_url(ip) if ip else None,
+        "vnc_port": 5900,
         "ram": {
             "total_bytes": mem_total,
             "used_bytes": mem_used,
@@ -349,6 +402,7 @@ def _system_stats() -> dict:
             "used_label": _bytes_label(disk_used),
             "free_label": _bytes_label(disk_free),
         },
+        "ssh": ssh_console.status(),
     }
 
 
@@ -391,6 +445,40 @@ def api_developer_system():
     if not _developer_enabled():
         return jsonify(error="Режим разработчика выключен"), 403
     return jsonify(ok=True, **_system_stats())
+
+
+@app.route("/api/developer/ssh", methods=["GET", "POST", "DELETE"])
+def api_developer_ssh():
+    if not _developer_enabled():
+        return jsonify(ok=False, error="Режим разработчика выключен"), 403
+
+    if request.method == "GET":
+        return jsonify(ok=True, output=ssh_console.read_output(), **ssh_console.status())
+
+    if request.method == "DELETE":
+        return jsonify(ok=True, **ssh_console.stop())
+
+    data = request.get_json(silent=True) or {}
+    action = str(data.get("action") or "input").strip().lower()
+    if action == "connect":
+        host = data.get("host") or _primary_device_ip() or "127.0.0.1"
+        try:
+            state = ssh_console.start(str(host))
+        except RuntimeError as error:
+            return jsonify(ok=False, error=str(error)), 500
+        return jsonify(ok=True, output=ssh_console.read_output(), **state)
+
+    if action == "disconnect":
+        return jsonify(ok=True, **ssh_console.stop())
+
+    text = data.get("input", data.get("command", ""))
+    if not isinstance(text, str) or text == "":
+        return jsonify(ok=False, error="Пустая команда"), 400
+    try:
+        state = ssh_console.write(text)
+    except RuntimeError as error:
+        return jsonify(ok=False, error=str(error)), 409
+    return jsonify(ok=True, **state)
 
 
 @app.route("/api/developer/shutdown", methods=["POST"])
