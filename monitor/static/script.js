@@ -101,7 +101,7 @@ function showAlarmPopup(key, kind, value) {
   popup.setAttribute('role', 'alert');
 
   const title = document.createElement('h3');
-  title.textContent = `${limits.label}: ${formatAlarmValue(key, value)}${limits.unit} — ${direction}`;
+  title.textContent = `${limits.label}: ${formatAlarmValue(key, value)}${limits.unit} - ${direction}`;
 
   const note = document.createElement('p');
   note.textContent = 'Уведомление также отправлено на вашу электронную почту.';
